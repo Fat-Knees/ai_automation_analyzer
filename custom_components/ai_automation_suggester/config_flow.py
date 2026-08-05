@@ -48,6 +48,10 @@ from .const import (
     CONF_LOCALAI_TEMPERATURE,
     CONF_MAX_INPUT_TOKENS,
     CONF_MAX_OUTPUT_TOKENS,
+    CONF_MINIMAX_API_KEY,
+    CONF_MINIMAX_BASE_URL,
+    CONF_MINIMAX_MODEL,
+    CONF_MINIMAX_TEMPERATURE,
     CONF_MISTRAL_API_KEY,
     CONF_MISTRAL_MODEL,
     CONF_MISTRAL_TEMPERATURE,
@@ -91,6 +95,7 @@ from .const import (
     DEFAULT_TEMPERATURE,
     DOMAIN,
     ENDPOINT_PERPLEXITY,
+    MINIMAX_BASE_URLS,
     VERSION_ANTHROPIC,
 )
 from .endpoint_utils import (
@@ -253,6 +258,16 @@ class ProviderValidator:
         except Exception as err:
             return sanitize_provider_error(err)
 
+    async def validate_minimax(self, api_key: str, base_url: str) -> str | None:
+        hdr = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        try:
+            async with self.session.get(
+                f"{base_url.rstrip('/')}/models", headers=hdr, timeout=self.timeout
+            ) as response:
+                return await self._response_error(response)
+        except Exception as err:
+            return sanitize_provider_error(err)
+
     async def validate_generic_openai(self, endpoint: str, api_key: str) -> str | None:
         hdr = {"Content-Type": "application/json"}
         if api_key:
@@ -297,7 +312,7 @@ class AIAutomationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "Perplexity AI": self.async_step_perplexity,
                 "OpenRouter": self.async_step_openrouter,
                 "Requesty": self.async_step_requesty,
-                "MiniMax": self.async_step_requesty,
+                "MiniMax": self.async_step_minimax,
                 "OpenAI Azure": self.async_step_openai_azure,
                 "Generic OpenAI": self.async_step_generic_openai,
                 "LiteLLM": self.async_step_litellm,
@@ -638,6 +653,32 @@ class AIAutomationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             user_input,
         )
 
+    async def async_step_minimax(self, user_input=None):
+        async def _v(ui):
+            return await self.validator.validate_minimax(
+                ui[CONF_MINIMAX_API_KEY],
+                ui.get(CONF_MINIMAX_BASE_URL, MINIMAX_BASE_URLS[0]),
+            )
+
+        schema = {
+            vol.Required(CONF_MINIMAX_API_KEY): TextSelector(TextSelectorConfig(type="password")),
+            vol.Optional(CONF_MINIMAX_MODEL, default=DEFAULT_MODELS["MiniMax"]): str,
+            vol.Optional(CONF_MINIMAX_BASE_URL, default=MINIMAX_BASE_URLS[0]): vol.In(MINIMAX_BASE_URLS),
+            vol.Optional(CONF_MINIMAX_TEMPERATURE, default=DEFAULT_TEMPERATURE): vol.All(
+                vol.Coerce(float), vol.Range(min=0.0, max=2.0)
+            ),
+        }
+        self._add_token_fields(schema)
+        return await self._provider_form(
+            "minimax",
+            vol.Schema(schema),
+            _v,
+            "AI Automation Suggester (MiniMax)",
+            {},
+            {},
+            user_input,
+        )
+
     async def async_step_openai_azure(self, user_input=None):
         async def _v(ui):
             if not ui.get(CONF_OPENAI_AZURE_API_KEY) or not ui.get(CONF_OPENAI_AZURE_DEPLOYMENT_ID) or not ui.get(CONF_OPENAI_AZURE_API_VERSION):
@@ -822,6 +863,11 @@ class AIAutomationOptionsFlowHandler(config_entries.OptionsFlow):
             schema[vol.Optional(CONF_REQUESTY_MODEL, default=self._get_option(CONF_REQUESTY_MODEL, DEFAULT_MODELS["Requesty"]))] = str
             schema[vol.Optional(CONF_REQUESTY_REASONING_MAX_TOKENS, default=self._get_option(CONF_REQUESTY_REASONING_MAX_TOKENS, 0))] = vol.All(vol.Coerce(int), vol.Range(min=0))
             schema[vol.Optional(CONF_REQUESTY_TEMPERATURE, default=self._get_option(CONF_REQUESTY_TEMPERATURE, DEFAULT_TEMPERATURE))] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=2.0))
+        elif provider == "MiniMax":
+            schema[vol.Optional(CONF_MINIMAX_API_KEY, default=self._get_option(CONF_MINIMAX_API_KEY))] = TextSelector(TextSelectorConfig(type="password"))
+            schema[vol.Optional(CONF_MINIMAX_MODEL, default=self._get_option(CONF_MINIMAX_MODEL, DEFAULT_MODELS["MiniMax"]))] = str
+            schema[vol.Optional(CONF_MINIMAX_BASE_URL, default=self._get_option(CONF_MINIMAX_BASE_URL, MINIMAX_BASE_URLS[0]))] = vol.In(MINIMAX_BASE_URLS)
+            schema[vol.Optional(CONF_MINIMAX_TEMPERATURE, default=self._get_option(CONF_MINIMAX_TEMPERATURE, DEFAULT_TEMPERATURE))] = vol.All(vol.Coerce(float), vol.Range(min=0.0, max=2.0))
         elif provider == "OpenAI Azure":
             schema[vol.Optional(CONF_OPENAI_AZURE_API_KEY, default=self._get_option(CONF_OPENAI_AZURE_API_KEY))] = TextSelector(TextSelectorConfig(type="password"))
             schema[vol.Optional(CONF_OPENAI_AZURE_ENDPOINT, default=self._get_option(CONF_OPENAI_AZURE_ENDPOINT))] = str
