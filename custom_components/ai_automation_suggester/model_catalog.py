@@ -386,6 +386,26 @@ PROVIDER_CATALOGS: dict[str, ProviderCatalog] = {
         True,
         "https://router.requesty.ai/v1/models",
     ),
+    "MiniMax": ProviderCatalog(
+        "MiniMax",
+        "MiniMax-M3",
+        (
+            ModelCapabilities(
+                "MiniMax-M3",
+                "MiniMax M3",
+                context_window=1_000_000,
+                supports_reasoning=True,
+            ),
+            ModelCapabilities(
+                "MiniMax-M2.7",
+                "MiniMax M2.7",
+                context_window=204_800,
+                supports_reasoning=True,
+            ),
+        ),
+        True,
+        "https://api.minimax.io/v1/models",
+    ),
 }
 
 
