@@ -128,6 +128,17 @@
           "max_output_tokens": "Max Output Tokens"
         }
       },
+      "minimax": {
+        "title": "Configure MiniMax",
+        "data": {
+          "minimax_api_key": "MiniMax API Key",
+          "minimax_model": "MiniMax Model",
+          "minimax_base_url": "MiniMax API Region",
+          "minimax_temperature": "Temperature",
+          "max_input_tokens": "Max Input Tokens",
+          "max_output_tokens": "Max Output Tokens"
+        }
+      },
       "openai_azure": {
         "title": "Configure OpenAI Azure",
         "data": {
@@ -222,6 +233,10 @@
           "requesty_model": "Requesty Model",
           "requesty_reasoning_max_tokens": "Requesty Reasoning Max Tokens",
           "requesty_temperature": "Temperature (Requesty)",
+          "minimax_api_key": "MiniMax API Key",
+          "minimax_model": "MiniMax Model",
+          "minimax_base_url": "MiniMax API Region",
+          "minimax_temperature": "Temperature (MiniMax)",
           "openai_azure_api_key": "Azure OpenAI API Key",
           "openai_azure_deployment_id": "Azure Deployment ID",
           "openai_azure_endpoint": "Azure Endpoint",

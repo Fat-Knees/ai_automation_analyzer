@@ -64,6 +64,10 @@ from .const import (
     CONF_MAX_INPUT_TOKENS,
     CONF_MAX_OUTPUT_TOKENS,
     CONF_MAX_TOKENS,
+    CONF_MINIMAX_API_KEY,
+    CONF_MINIMAX_BASE_URL,
+    CONF_MINIMAX_MODEL,
+    CONF_MINIMAX_TEMPERATURE,
     CONF_MISTRAL_API_KEY,
     CONF_MISTRAL_MODEL,
     CONF_MISTRAL_TEMPERATURE,
@@ -112,6 +116,7 @@ from .const import (
     ENDPOINT_OPENROUTER,
     ENDPOINT_PERPLEXITY,
     ENDPOINT_REQUESTY,
+    MINIMAX_BASE_URLS,
     VERSION_ANTHROPIC,
 )
 from .endpoint_utils import bearer_auth_headers, ollama_api_candidates, ollama_base_url, openai_chat_endpoint
@@ -274,6 +279,7 @@ class AIAutomationCoordinator(DataUpdateCoordinator):
             "Perplexity AI": CONF_PERPLEXITY_MODEL,
             "OpenRouter": CONF_OPENROUTER_MODEL,
             "Requesty": CONF_REQUESTY_MODEL,
+            "MiniMax": CONF_MINIMAX_MODEL,
             "OpenAI Azure": CONF_OPENAI_AZURE_DEPLOYMENT_ID,
             "Generic OpenAI": CONF_GENERIC_OPENAI_MODEL,
             "LiteLLM": CONF_LITELLM_MODEL,
@@ -872,6 +878,7 @@ class AIAutomationCoordinator(DataUpdateCoordinator):
             "Perplexity AI": self._perplexity,
             "OpenRouter": self._openrouter,
             "Requesty": self._requesty,
+            "MiniMax": self._minimax,
             "OpenAI Azure": self._openai_azure,
             "Generic OpenAI": self._generic_openai,
             "LiteLLM": self._litellm,
@@ -1329,6 +1336,23 @@ class AIAutomationCoordinator(DataUpdateCoordinator):
             provider_label="Requesty",
         )
         return self._extract_chat_content(response, "Requesty") if response else None
+
+    async def _minimax(self, prompt: str) -> str | None:
+        api_key = self._opt(CONF_MINIMAX_API_KEY)
+        if not api_key:
+            raise ValueError("MiniMax API key not configured")
+        body = self._openai_compatible_body(
+            provider="MiniMax", model=self._current_model("MiniMax"),
+            prompt=self._trim_prompt(prompt),
+            temperature=float(self._opt(CONF_MINIMAX_TEMPERATURE, DEFAULT_TEMPERATURE)),
+        )
+        base_url = self._opt(CONF_MINIMAX_BASE_URL, MINIMAX_BASE_URLS[0]).rstrip("/")
+        response = await self._post_json(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            body=body, provider_label="MiniMax",
+        )
+        return self._extract_chat_content(response, "MiniMax") if response else None
 
     async def _litellm(self, prompt: str) -> str | None:
         import litellm

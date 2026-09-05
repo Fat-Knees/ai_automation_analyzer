@@ -36,6 +36,15 @@ def test_unknown_local_model_is_allowed_as_custom():
     assert capabilities.status == model_catalog.STATUS_CUSTOM
 
 
+def test_minimax_catalog_contains_target_models():
+    catalog = model_catalog.get_provider_catalog("MiniMax")
+
+    assert catalog.default_model == "MiniMax-M3"
+    assert [item.model for item in catalog.models] == ["MiniMax-M3", "MiniMax-M2.7"]
+    assert model_catalog.get_model_capabilities("MiniMax", "MiniMax-M3").context_window == 1_000_000
+    assert model_catalog.get_model_capabilities("MiniMax", "MiniMax-M2.7").context_window == 204_800
+
+
 def test_google_json_schema_strips_additional_properties():
     schema = model_catalog.google_json_schema_response_format()["json_schema"]["schema"]
 

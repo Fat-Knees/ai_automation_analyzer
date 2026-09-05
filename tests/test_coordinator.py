@@ -239,3 +239,33 @@ def test_generate_propagates_provider_failure(monkeypatch):
 
     with pytest.raises(ValueError, match="rate limited"):
         asyncio.run(coordinator.async_generate_suggestions(all_entities=True))
+
+
+def test_minimax_uses_provider_specific_configuration(monkeypatch):
+    coordinator, _, _ = make_coordinator(
+        monkeypatch,
+        states={},
+        options={
+            "provider": "MiniMax",
+            "minimax_api_key": "secret",
+            "minimax_model": "MiniMax-M2.7",
+            "minimax_base_url": "https://api.minimaxi.com/v1",
+            "minimax_temperature": 0.4,
+        },
+    )
+    request = {}
+
+    async def post_json(endpoint, *, headers=None, body=None, provider_label=None):
+        request.update(endpoint=endpoint, headers=headers, body=body, provider_label=provider_label)
+        return {"choices": [{"message": {"content": "ok"}}]}
+
+    coordinator._post_json = post_json
+
+    result = asyncio.run(coordinator._minimax("hello"))
+
+    assert result == "ok"
+    assert request["endpoint"] == "https://api.minimaxi.com/v1/chat/completions"
+    assert request["headers"]["Authorization"] == "Bearer secret"
+    assert request["body"]["model"] == "MiniMax-M2.7"
+    assert request["body"]["temperature"] == 0.4
+    assert request["provider_label"] == "MiniMax"
