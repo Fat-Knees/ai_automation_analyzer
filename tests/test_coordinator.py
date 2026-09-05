@@ -269,3 +269,67 @@ def test_minimax_uses_provider_specific_configuration(monkeypatch):
     assert request["body"]["model"] == "MiniMax-M2.7"
     assert request["body"]["temperature"] == 0.4
     assert request["provider_label"] == "MiniMax"
+
+
+@pytest.mark.parametrize("disable_think", [True, False, None])
+def test_ollama_disable_think_uses_native_parameter(monkeypatch, disable_think):
+    options = {
+        "provider": "Ollama",
+        "ollama_base_url": "http://localhost:11434",
+        "ollama_model": "gemma4:12b",
+    }
+    if disable_think is not None:
+        options["ollama_disable_think"] = disable_think
+    coordinator, _, _ = make_coordinator(monkeypatch, states={}, options=options)
+    request = {}
+
+    async def post_json(endpoint, *, headers=None, body=None, provider_label=None):
+        request.update(endpoint=endpoint, body=body)
+        return {"message": {"content": "ok"}, "done_reason": "stop"}
+
+    coordinator._post_json = post_json
+
+    assert asyncio.run(coordinator._ollama("hello")) == "ok"
+    assert request["endpoint"] == "http://localhost:11434/api/chat"
+    assert request["body"]["model"] == "gemma4:12b"
+    if disable_think:
+        assert request["body"]["think"] is False
+        assert request["body"]["messages"][0]["content"] == "/no_think"
+    else:
+        assert "think" not in request["body"]
+        assert request["body"]["messages"] == [{"role": "user", "content": "hello"}]
+
+
+@pytest.mark.parametrize("reasoning_field", ["reasoning_content", "reasoning"])
+@pytest.mark.parametrize("content", [None, ""])
+def test_chat_response_uses_reasoning_fallback(monkeypatch, reasoning_field, content):
+    coordinator, _, _ = make_coordinator(monkeypatch, states={})
+    answer = "```yaml\nalias: Reasoning answer\ntriggers: []\nactions: []\n```"
+    response = {"choices": [{"message": {"content": content, reasoning_field: answer}, "finish_reason": "stop"}]}
+
+    assert coordinator._extract_chat_content(response, "OpenRouter") == answer
+    assert coordinator._last_response_metadata["finish_reason"] == "stop"
+
+
+def test_chat_response_prefers_final_answer_over_reasoning(monkeypatch):
+    coordinator, _, _ = make_coordinator(monkeypatch, states={})
+    response = {"choices": [{"message": {"content": "Final answer", "reasoning_content": "Draft reasoning"}}]}
+
+    assert coordinator._extract_chat_content(response, "OpenRouter") == "Final answer"
+
+
+def test_empty_chat_response_is_an_explicit_error(monkeypatch):
+    coordinator, _, _ = make_coordinator(monkeypatch, states={})
+
+    with pytest.raises(ValueError, match="empty content"):
+        coordinator._extract_chat_content({"choices": [{"message": {"content": ""}}]}, "OpenRouter")
+
+
+@pytest.mark.parametrize("provider,key,model", [
+    ("Google", "google_model", "gemini-2.5-flash"),
+    ("Groq", "groq_model", "llama-3.3-70b-versatile"),
+])
+def test_configured_models_are_not_replaced_by_new_defaults(monkeypatch, provider, key, model):
+    coordinator, _, _ = make_coordinator(monkeypatch, states={}, options={"provider": provider, key: model})
+
+    assert coordinator._current_model() == model

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.0 - 2026-09-05
+
+### Added
+
+- Added MiniMax as a first-class provider with global/China API regions, configurable credentials and temperature, MiniMax-M3 as the default, and MiniMax-M2.7 catalog support. Thanks @octo-patch (PR #178).
+- Added regression coverage for provider status, reasoning-response fallback, configured-model preservation, nested YAML fences, and setup/options timeout validation.
+
+### Fixed
+
+- Fixed the LiteLLM model sensor reporting `Unknown Model Key` and repeatedly logging warnings. Thanks @mjacobs (PR #186, issue #185).
+- Ollama's existing Disable Think option now sends native `think: false` as well as the legacy `/no_think` prompt hint. Disabled/unset options leave the provider's native thinking behavior unchanged (issue #188).
+- Removed complete Markdown YAML fences inside structured suggestion fields before YAML validation, preserving newlines and indentation. This addresses a reproducible wrapper-related case from the investigation of issue #172.
+
+### Changed
+
+- New Google configurations default to `gemini-3.5-flash` because Gemini 2.5 Flash is unavailable to new users (issue #184).
+- New Groq configurations default to `openai/gpt-oss-120b`. Deprecated Llama IDs now warn with current replacements, and `qwen/qwen3.6-27b` is listed as a preview alternative (issue #187).
+- Removed the 1800-second request timeout maximum from both setup and options. The default remains 900 seconds and the minimum remains 10 seconds (issue #182).
+- Documented model migration, reasoning-model token budgets, startup status, and explicit generation troubleshooting. Existing configured models, token budgets, and suggestion history are preserved.
+
 ## 1.5.10 - 2026-07-11
 
 ### Fixed

@@ -46,7 +46,7 @@ The integration follows a simple, effective process:
 |------|---------------|---------|
 | **1&nbsp;· Snapshot** | Collects data about your home. | On manual trigger or schedule, the integration gathers information on your entities (including attributes), devices, areas, **and** existing automations. You can control the scope using filters and limits. |
 | **2&nbsp;· Prompt Building** | Structures the data for the AI. | This snapshot is embedded into a detailed system prompt describing your specific Home Assistant setup. You can enhance this with a *custom prompt* to steer suggestions towards specific goals (e.g., "focus on presence lighting"). |
-| **3&nbsp;· Provider Call** | Sends the prompt to the AI. | The crafted prompt is sent to your configured AI provider (OpenAI, Azure OpenAI, Anthropic, Google, Groq, LocalAI, Ollama, Mistral, Perplexity, OpenRouter, Requesty, LiteLLM, or another OpenAI-compatible endpoint). |
+| **3&nbsp;· Provider Call** | Sends the prompt to the AI. | The crafted prompt is sent to your configured AI provider (OpenAI, Azure OpenAI, Anthropic, Google, Groq, LocalAI, Ollama, Mistral, Perplexity, OpenRouter, Requesty, MiniMax, LiteLLM, or another OpenAI-compatible endpoint). |
 | **4&nbsp;· Parsing** | Processes the AI's response. | The integration asks capable providers for structured JSON, falls back to fenced YAML parsing, validates returned YAML, and records warnings for missing or possibly truncated output. |
 | **5&nbsp;· Surface** | Delivers and stores the suggestions. | Suggestions appear as Home Assistant persistent notifications, sensor attributes, and stored history that can be used by the bundled dashboard card or your own cards. |
 
@@ -95,12 +95,12 @@ Leveraging the AI Automation Suggester provides several key benefits:
 
 ## 📦 Features
 
-* **Multi-Provider Support:** Connect to OpenAI, OpenAI Azure, Anthropic, Google, Groq, LocalAI, Ollama, Mistral, Perplexity, OpenRouter, Requesty, or LiteLLM (100+ backends) with full configuration options:
+* **Multi-Provider Support:** Connect to OpenAI, OpenAI Azure, Anthropic, Google, Groq, LocalAI, Ollama, Mistral, Perplexity, OpenRouter, Requesty, MiniMax, or LiteLLM (100+ backends) with full configuration options:
     * Temperature control for all providers (0.0 - 2.0)
     * Model selection with provider-specific defaults
     * Secure API key storage
     * Custom endpoints for compatible providers
-    * Advanced options like Ollama's think mode control
+    * Ollama's Disable Think option sends native `think: false` and the legacy `/no_think` prompt hint. Leaving it off preserves the model's default thinking behavior.
 * **Customizable Prompts and Filters:** Tailor suggestions using system prompts, domain filters, and entity limits.
 * **Persistent Suggestion History:** Retain recent suggestions with provider/model metadata, review status, warnings, and generated YAML.
 * **Review Actions:** Mark stored suggestions as accepted, declined, or dismissed through services or the bundled dashboard card.
@@ -118,7 +118,7 @@ Leveraging the AI Automation Suggester provides several key benefits:
 
 * **Home Assistant:** Version 2024.1 or later.
 * **AI Provider Setup:** You will need access to an AI model.
-    * For cloud providers (OpenAI, Anthropic, Google, Groq, Mistral, Perplexity, OpenRouter, Requesty), you’ll need API keys.
+    * For cloud providers (OpenAI, Anthropic, Google, Groq, Mistral, Perplexity, OpenRouter, Requesty, MiniMax), you will need API keys.
     * For local models (LocalAI, Ollama), ensure the local servers are running and accessible from Home Assistant.
 
 ---
@@ -180,12 +180,14 @@ You can adjust these settings later via the integration options in Settings → 
     * Separate input/output token limits
     * Prevents excessive API usage
     * Optimizes response length
+    * Defaults remain 500 tokens per budget for compatibility. For reasoning models or missing/truncated YAML, try 16000 input tokens and 4096 output tokens with a small entity limit, then adjust within your model's limits.
+    * Reasoning may consume output tokens before the final YAML is produced. Higher limits can increase usage and cost. Limits are ceilings, not measurements of billed tokens. Check your provider's usage dashboard and current pricing.
 
 * **History and Filtering:**
     * Persistent custom system prompt
     * Excluded domains, entities, and areas
     * Stored suggestion history retention
-    * Provider request timeout for slow local or research models
+    * Provider request timeout for slow local or research models, in seconds. Default: 900. Minimum: 10. There is no maximum, so 7200 allows a two-hour request. Zero does not disable the timeout.
 
 ---
 
@@ -198,16 +200,21 @@ Model APIs change quickly, so the integration keeps a compatibility catalog and 
 | OpenAI | `gpt-5.4-mini` | GPT-5-style models use the Responses API, `max_output_tokens`, and reasoning effort. Temperature is not sent to models known to reject it. `gpt-5.5` and `gpt-5.5-pro` are supported when available on your account. |
 | Azure OpenAI | `gpt-5.4-mini` deployment name | Azure uses deployment names. Configure the deployment ID, endpoint, and API version that match your Azure resource. |
 | Anthropic | `claude-sonnet-4-6` | Supports current Claude Sonnet/Opus model IDs such as `claude-sonnet-4-6` and `claude-opus-4-7`. |
-| Google Gemini | `gemini-2.5-flash` | Replaces the stale `gemini-2.0-flash` default. Gemini 3 preview IDs can be entered manually. |
-| Groq | `llama-3.3-70b-versatile` | Replaces the stale `llama3-8b-8192` default. Custom Groq model IDs are still allowed. |
+| Google Gemini | `gemini-3.5-flash` | Stable replacement for Gemini 2.5 Flash, which is unavailable to new users. Custom model IDs are still allowed. |
+| Groq | `openai/gpt-oss-120b` | Replaces `llama-3.3-70b-versatile`, retired for free/developer accounts on 2026-08-16. `openai/gpt-oss-20b` is another production option. `qwen/qwen3.6-27b` is a preview alternative. Enterprise Llama access may remain. |
 | Mistral AI | `mistral-small-latest` | Supports current `*-latest` aliases and custom published IDs. |
 | Perplexity AI | `sonar` | Supports Sonar, Sonar Pro, reasoning, and research-style model IDs where your account has access. |
 | OpenRouter | `openai/gpt-5.4-mini` | OpenRouter remains dynamic. Use provider-prefixed IDs from OpenRouter's model catalog. |
 | Requesty | `openai/gpt-4o-mini` | OpenAI-compatible router (`https://router.requesty.ai`) providing 300+ models through a single API key. Use provider-prefixed model IDs. |
+| MiniMax | `MiniMax-M3` | OpenAI-compatible provider with global (`https://api.minimax.io/v1`) and China (`https://api.minimaxi.com/v1`) regions. `MiniMax-M2.7` is also in the catalog. Use a MiniMax API key for the selected region. |
 | LiteLLM | `openai/gpt-4o-mini` | Uses the LiteLLM Python SDK to reach 100+ backends (OpenAI, Bedrock, Azure, Vertex, Groq, and more). Model IDs follow the LiteLLM naming scheme. |
 | LocalAI/Ollama/custom OpenAI-compatible | User configured | Custom model names remain valid and are treated conservatively. |
 
 For maximum stability, prefer stable model IDs over preview or `latest` aliases unless you intentionally want fast-moving behavior.
+
+Upgrading does not replace saved model selections. If an existing Google or Groq entry returns a model-not-found error, open its integration options and select a current model above. Availability depends on your provider account. See [Google's model catalog](https://ai.google.dev/gemini-api/docs/models) and [Groq's deprecation notices](https://console.groq.com/docs/deprecations).
+
+The Anthropic provider uses API key authentication. A Claude Pro/Max subscription is not an API key or API credit balance. This integration does not collect Claude.ai session tokens or route requests through subscription credentials. See [Anthropic's authentication requirements](https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use).
 
 ---
 
@@ -226,7 +233,7 @@ Find and enable these examples in Settings → Automations.
 
 You can trigger the suggestion generation manually using the service call:
 
-1.  Go to Developer Tools → **Services**.
+1.  Go to Developer Tools > **Actions** (called **Services** on older Home Assistant versions).
 2.  Select the service `ai_automation_suggester.generate_suggestions`.
 3.  Call the service. You can pass parameters to customize the request:
     * `all_entities` (boolean, default: `false`): Set to `true` to consider all eligible entities, `false` to only consider entities added since the last successful run.
@@ -283,7 +290,8 @@ The integration provides several sensors for monitoring:
         * `warnings`: Parsing, model, or truncation warnings
 
 * **AI Provider Status:** (`sensor.ai_provider_status_<provider_name>`)
-    * State: `connected`, `error`, `disconnected`, `initializing`
+    * State: `connected`, `error`, `initializing`
+    * Reports the last provider request outcome, not continuous provider health. No inference is started during integration startup. `initializing` means no provider request outcome is available yet.
     * Attributes:
         * `last_error_message`: Details of any errors
         * `last_attempted_update`: Timestamp of last attempt
@@ -381,7 +389,7 @@ The integration provides two key sensors for monitoring:
     * State indicates the status (e.g., `idle`, `generating`, `suggestions_available`).
     * Attributes contain the latest suggestions, including `description`, `yaml_block`, and potentially other details depending on the AI provider's response format.
 * **AI Provider Status Sensor:** `sensor.ai_provider_status_<provider_name>`
-    * State indicates the connection health (e.g., `connected`, `error`, `unavailable`).
+    * State indicates the last generation outcome (`connected` or `error`), or `initializing` before a provider request completes.
     * Attributes may provide additional details about the provider status or any errors encountered.
 
 Monitor these sensors to ensure the integration is functioning correctly.
@@ -402,6 +410,8 @@ Monitor these sensors to ensure the integration is functioning correctly.
 
 | Symptom                                 | Check / Action                                                                                                                               |
 |-----------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| **AI Provider Status stays `initializing`** | Run `ai_automation_suggester.generate_suggestions` explicitly with `all_entities: true`, `entity_limit: 50`, and automation/script YAML reading disabled. Select the affected provider entry when using multiple instances. Inspect the action result, `last_error_message`, and `last_attempted_update`. An empty entity selection makes no provider call and can leave the status unchanged. |
+| **Missing or truncated YAML with a reasoning model** | Increase input/output budgets as described under Token Management and reduce the entity limit. Four-space YAML indentation is valid and is preserved. Complete YAML Markdown fences inside structured output are removed without flattening the content. If YAML still fails, include a sanitized raw provider response in your issue report. |
 | **No suggestions available** | - Verify API key is correct.<br>- Check the `AI Provider Status` sensor for errors.<br>- Check the Home Assistant logs for errors related to the integration.<br>- Try triggering the service manually with a small `entity_limit` and no domain filters.<br>- Ensure you have enough entities/devices for meaningful suggestions. |
 | **AI Provider Status shows `error`** | - Inspect the Home Assistant log (`home-assistant.log`) for detailed error messages (look for `ai_automation_suggester` and `processing error`).<br>- Check your network connection to the provider's server (if cloud-based) or your local server.<br>- Confirm your API key is active and has permissions.<br>- Ensure your local AI server is running and accessible. |
 | **Suggestion prompt is too long** | - Reduce the `entity_limit` parameter when triggering the service or configuring the automation.<br>- Use the `domains` filter to narrow the scope of entities analyzed.<br>- Shorten or simplify your `custom_prompt` if you are using one. |

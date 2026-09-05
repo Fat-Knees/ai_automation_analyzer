@@ -1221,6 +1221,8 @@ class AIAutomationCoordinator(DataUpdateCoordinator):
                 "num_predict": out_budget,
             },
         }
+        if self._opt(CONF_OLLAMA_DISABLE_THINK, False):
+            body["think"] = False
         response = None
         headers = bearer_auth_headers(self._opt(CONF_OLLAMA_API_KEY))
         for endpoint in ollama_api_candidates(base, "api/chat"):

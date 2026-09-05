@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 
 def load_module(name: str):
@@ -68,6 +71,45 @@ action: []
 
     assert parsed[0]["description"].startswith("Use this automation")
     assert "Kitchen reminder" in parsed[0]["yamlCode"]
+
+
+@pytest.mark.parametrize("response_format", ["fenced_yaml", "plain_json", "structured_json", "fenced_json", "malformed_json"])
+def test_yaml_fences_preserve_newlines_and_four_space_indentation(response_format):
+    yaml_code = """alias: Climate helper
+triggers:
+    - trigger: state
+      entity_id: input_boolean.climate
+      to: 'on'
+actions:
+    - action: button.press
+      target:
+          entity_id: button.air1_power_on"""
+    fenced_yaml = f"```yaml\n{yaml_code}\n```"
+    payload = json.dumps({"suggestions": [{
+        "title": "Climate helper",
+        "description": "Preserve YAML formatting.",
+        "yaml": yaml_code if response_format == "plain_json" else fenced_yaml,
+    }]})
+    if response_format == "fenced_yaml":
+        raw = fenced_yaml
+    elif response_format == "fenced_json":
+        raw = f"```json\n{payload}\n```"
+    elif response_format == "malformed_json":
+        raw = payload[:-1] + ",}"
+    else:
+        raw = payload
+
+    parsed = suggestions.parse_suggestion_response(
+        raw,
+        provider="Google",
+        model="gemini-3.5-flash",
+        created_at=datetime(2026, 9, 5, 12, 0, 0),
+        entities_processed=["input_boolean.climate", "button.air1_power_on"],
+    )
+
+    assert parsed[0]["yamlCode"] == yaml_code
+    assert parsed[0]["services_used"] == ["button.press"]
+    assert not any("could not be parsed" in warning for warning in parsed[0]["warnings"])
 
 
 def test_length_finish_reason_adds_warning():

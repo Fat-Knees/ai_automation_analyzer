@@ -189,13 +189,22 @@ PROVIDER_CATALOGS: dict[str, ProviderCatalog] = {
     ),
     "Google": ProviderCatalog(
         "Google",
-        "gemini-2.5-flash",
+        "gemini-3.5-flash",
         (
+            ModelCapabilities(
+                "gemini-3.5-flash",
+                "Gemini 3.5 Flash",
+                supports_structured_output=True,
+                supports_json_schema=True,
+                supports_reasoning=True,
+            ),
             ModelCapabilities(
                 "gemini-2.5-flash",
                 "Gemini 2.5 Flash",
                 supports_structured_output=True,
                 supports_json_schema=True,
+                status=STATUS_DEPRECATED,
+                notes=("Unavailable to new users; use gemini-3.5-flash for new configurations.",),
             ),
             ModelCapabilities(
                 "gemini-2.5-pro",
@@ -231,17 +240,47 @@ PROVIDER_CATALOGS: dict[str, ProviderCatalog] = {
     ),
     "Groq": ProviderCatalog(
         "Groq",
-        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
         (
-            ModelCapabilities("llama-3.3-70b-versatile", "Llama 3.3 70B Versatile"),
-            ModelCapabilities("llama-3.1-8b-instant", "Llama 3.1 8B Instant"),
-            ModelCapabilities("openai/gpt-oss-120b", "GPT OSS 120B"),
-            ModelCapabilities("openai/gpt-oss-20b", "GPT OSS 20B"),
+            ModelCapabilities(
+                "openai/gpt-oss-120b",
+                "GPT OSS 120B",
+                context_window=131_072,
+                max_output_tokens=65_536,
+                supports_reasoning=True,
+            ),
+            ModelCapabilities(
+                "openai/gpt-oss-20b",
+                "GPT OSS 20B",
+                context_window=131_072,
+                max_output_tokens=65_536,
+                supports_reasoning=True,
+            ),
+            ModelCapabilities(
+                "qwen/qwen3.6-27b",
+                "Qwen 3.6 27B",
+                context_window=131_072,
+                max_output_tokens=16_384,
+                supports_reasoning=True,
+                status=STATUS_PREVIEW,
+            ),
+            ModelCapabilities(
+                "llama-3.3-70b-versatile",
+                "Llama 3.3 70B Versatile",
+                status=STATUS_DEPRECATED,
+                notes=("Retired for free/developer accounts on 2026-08-16; use openai/gpt-oss-120b. Enterprise access may remain.",),
+            ),
+            ModelCapabilities(
+                "llama-3.1-8b-instant",
+                "Llama 3.1 8B Instant",
+                status=STATUS_DEPRECATED,
+                notes=("Retired for free/developer accounts on 2026-08-16; use openai/gpt-oss-20b. Enterprise access may remain.",),
+            ),
             ModelCapabilities(
                 "llama3-8b-8192",
                 "Llama 3 8B 8192",
                 status=STATUS_DEPRECATED,
-                notes=("Use llama-3.1-8b-instant or llama-3.3-70b-versatile.",),
+                notes=("Use openai/gpt-oss-20b or openai/gpt-oss-120b.",),
             ),
         ),
         True,

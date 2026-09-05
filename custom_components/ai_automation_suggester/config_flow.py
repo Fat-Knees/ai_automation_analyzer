@@ -389,7 +389,7 @@ class AIAutomationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Coerce(int), vol.Range(min=1, max=250)
         )
         base[vol.Optional(CONF_REQUEST_TIMEOUT, default=DEFAULT_REQUEST_TIMEOUT)] = vol.All(
-            vol.Coerce(int), vol.Range(min=10, max=1800)
+            vol.Coerce(int), vol.Range(min=10)
         )
         return base
 
@@ -804,7 +804,7 @@ class AIAutomationOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Optional(CONF_EXCLUDED_ENTITIES, default=self._get_option(CONF_EXCLUDED_ENTITIES, "")): str,
             vol.Optional(CONF_EXCLUDED_AREAS, default=self._get_option(CONF_EXCLUDED_AREAS, "")): str,
             vol.Optional(CONF_HISTORY_RETENTION, default=self._get_option(CONF_HISTORY_RETENTION, DEFAULT_HISTORY_RETENTION)): vol.All(vol.Coerce(int), vol.Range(min=1, max=250)),
-            vol.Optional(CONF_REQUEST_TIMEOUT, default=self._get_option(CONF_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT)): vol.All(vol.Coerce(int), vol.Range(min=10, max=1800)),
+            vol.Optional(CONF_REQUEST_TIMEOUT, default=self._get_option(CONF_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT)): vol.All(vol.Coerce(int), vol.Range(min=10)),
         }
 
         # provider‑specific editable fields

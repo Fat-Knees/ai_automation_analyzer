@@ -238,6 +238,9 @@ def _normalise_suggestion(
     description = str(item.get("description") or item.get("shortDescription") or "").strip()
     yaml_code = item.get("yaml") or item.get("yaml_block") or item.get("yamlCode")
     yaml_code = str(yaml_code).strip() if yaml_code else None
+    fenced_yaml = YAML_RE.fullmatch(yaml_code) if yaml_code else None
+    if fenced_yaml:
+        yaml_code = fenced_yaml.group(1).strip()
     warnings = [str(w) for w in inherited_warnings]
     warnings.extend(str(w) for w in _as_list(item.get("warnings")))
     yaml_warnings, yaml_entity_ids, services_used = _inspect_yaml(yaml_code)

@@ -22,11 +22,22 @@ def _install_homeassistant_stubs() -> None:
     device_registry = types.ModuleType("homeassistant.helpers.device_registry")
     entity_registry = types.ModuleType("homeassistant.helpers.entity_registry")
     aiohttp_client = types.ModuleType("homeassistant.helpers.aiohttp_client")
+    selector = types.ModuleType("homeassistant.helpers.selector")
     storage = types.ModuleType("homeassistant.helpers.storage")
     update_coordinator = types.ModuleType("homeassistant.helpers.update_coordinator")
 
     class HomeAssistant:
         pass
+
+    class ConfigFlow:
+        def __init_subclass__(cls, **kwargs):
+            pass
+
+        def async_show_form(self, **kwargs):
+            return kwargs
+
+        def async_create_entry(self, **kwargs):
+            return kwargs
 
     class DataUpdateCoordinator:
         def __init__(self, hass, logger, *, config_entry=None, name, update_interval=None):
@@ -87,6 +98,10 @@ def _install_homeassistant_stubs() -> None:
     sensor.SensorEntityDescription = SensorEntityDescription
     sensor.SensorStateClass = SensorStateClass
     config_entries.ConfigEntry = object
+    config_entries.ConfigFlow = ConfigFlow
+    config_entries.OptionsFlow = ConfigFlow
+    selector.TextSelector = lambda config: str
+    selector.TextSelectorConfig = dict
     const.STATE_UNKNOWN = "unknown"
     const.EntityCategory = EntityCategory
     entity_platform.AddEntitiesCallback = object
@@ -107,6 +122,7 @@ def _install_homeassistant_stubs() -> None:
     components.persistent_notification = persistent_notification
     components.sensor = sensor
     helpers.entity_platform = entity_platform
+    helpers.selector = selector
     homeassistant.config_entries = config_entries
     homeassistant.const = const
     helpers.area_registry = area_registry
@@ -130,6 +146,7 @@ def _install_homeassistant_stubs() -> None:
         "homeassistant.helpers.entity_registry": entity_registry,
         "homeassistant.helpers.aiohttp_client": aiohttp_client,
         "homeassistant.helpers.entity_platform": entity_platform,
+        "homeassistant.helpers.selector": selector,
         "homeassistant.helpers.storage": storage,
         "homeassistant.helpers.update_coordinator": update_coordinator,
     }
