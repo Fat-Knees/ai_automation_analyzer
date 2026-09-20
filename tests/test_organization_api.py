@@ -70,6 +70,7 @@ class FakeState:
         self.data = {"preferences": {"before": "value"}}
         self._report = report
         self.store = store or FakeStore()
+        self.active_entries = {"test-entry"}
 
     async def report(self):
         await asyncio.sleep(0)

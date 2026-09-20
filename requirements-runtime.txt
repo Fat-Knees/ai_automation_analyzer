@@ -2,3 +2,6 @@
 homeassistant==2026.9.3
 pytest-homeassistant-custom-component==0.13.366
 anyio>=4.0
+home-assistant-frontend==20260826.7
+anthropic>=0.8.0
+litellm>=1.67.0

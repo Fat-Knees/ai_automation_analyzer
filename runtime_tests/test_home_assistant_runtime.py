@@ -3,6 +3,7 @@ from pathlib import Path
 
 import homeassistant.core
 import pytest
+from homeassistant.components import frontend
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import area_registry, device_registry, entity_registry, floor_registry, label_registry
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -30,12 +31,34 @@ async def test_actual_setup_reload_unload_without_provider(hass):
     entry = await setup_local(hass)
     assert STATE_KEY in hass.data[DOMAIN]
     state = hass.data[DOMAIN][STATE_KEY]
+    assert "home-intelligence" in hass.data[frontend.DATA_PANELS]
     for _ in range(3):
         assert await hass.config_entries.async_reload(entry.entry_id)
         await hass.async_block_till_done()
         assert hass.data[DOMAIN][STATE_KEY] is state
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert entry.entry_id not in hass.data[DOMAIN]
+    assert not state.active_entries
+    assert "home-intelligence" not in hass.data[frontend.DATA_PANELS]
+
+
+async def test_readiness_and_card_resource(hass, hass_client):
+    entry = await setup_local(hass)
+    client = await hass_client()
+    response = await client.get("/api/ai_automation_suggester/readiness")
+    assert response.status == 200
+    ready = await response.json()
+    assert ready["ready"] is True
+    assert ready["ha_version"] == "2026.9.3"
+    assert ready["store_schema"] == 1
+    assert ready["registry_mutation_enabled"] is False
+    assert ready["active_entries"] == 1
+    response = await client.get("/ai_automation_suggester/home-intelligence-card.js")
+    assert response.status == 200
+    assert 'customElements.define("home-intelligence-card"' in await response.text()
+    await hass.config_entries.async_unload(entry.entry_id)
+    response = await client.get("/api/ai_automation_suggester/readiness")
+    assert response.status == 503
 
 
 async def test_real_registry_preview_and_stale_revision(hass, hass_client):
@@ -81,6 +104,8 @@ async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_a
     await setup_local(hass)
     client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
+    assert response.status == 403
+    response = await client.get("/api/ai_automation_suggester/readiness")
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/organization", json={"approved": True})
     assert response.status == 403

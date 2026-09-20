@@ -3,7 +3,7 @@
   "name": "AI Automation Suggester",
   "codeowners": ["@ITSpecialist111"],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": ["frontend", "http", "panel_custom"],
   "documentation": "https://github.com/ITSpecialist111/ai_automation_suggester",
   "integration_type": "service",
   "iot_class": "cloud_polling",
@@ -15,5 +15,5 @@
     "pyyaml>=6.0",
     "voluptuous>=0.13.1"
   ],
-  "version": "1.6.0"
+  "version": "1.6.1b1"
 }

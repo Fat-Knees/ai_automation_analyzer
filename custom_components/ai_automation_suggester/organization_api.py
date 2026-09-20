@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,6 +20,16 @@ LOCAL_PROVIDER = "Local audit (no AI)"
 MAX_INVENTORY = 5000
 MAX_MAPPINGS = 20000
 STATE_KEY = "organization_state"
+PANEL_PATH = "home-intelligence"
+
+
+def read_build():
+    """Read only the release marker; source checkouts identify as development."""
+    marker = Path(__file__).with_name("_build.json")
+    if not marker.exists():
+        return {"commit": None, "format_version": 1, "source": "development"}
+    metadata = json.loads(marker.read_text(encoding="utf-8"))
+    return {"commit": metadata["commit"], "format_version": metadata["format_version"], "source": "release"}
 
 
 def definition_snapshot(value, budget, depth=0):
@@ -105,6 +116,8 @@ class OrganizationState:
         self.store = Store(hass, 1, f"{DOMAIN}.organization")
         self.lock = asyncio.Lock()
         self.data = None
+        self.active_entries = set()
+        self.build = None
 
     async def load(self):
         if self.data is None:
@@ -150,7 +163,7 @@ class OrganizationView(HomeAssistantView):
             raise web.HTTPForbidden(reason="Organization audit requires an administrator")
         hass = request.app[KEY_HASS]
         state = hass.data[DOMAIN].get(STATE_KEY)
-        if state is None:
+        if state is None or not state.active_entries:
             raise web.HTTPServiceUnavailable(reason="Organization audit is not configured")
         return state
 
@@ -166,7 +179,6 @@ class OrganizationView(HomeAssistantView):
     async def post(self, request):
         state = self.state(request)
         # A small streamed limit applies even to chunked requests.
-        import json
         payload = bytearray()
         async for chunk in request.content.iter_chunked(8192):
             payload.extend(chunk)
@@ -205,8 +217,52 @@ async def async_setup_organization(hass):
         return
     state = OrganizationState(hass)
     await state.load()
+    state.build = await hass.async_add_executor_job(read_build)
     await hass.http.async_register_static_paths([StaticPathConfig(
         "/ai_automation_suggester/home-intelligence-card.js",
         str(Path(__file__).parent / "www" / "ai_automation_suggester" / "home-intelligence-card.js"), False)])
     hass.http.register_view(OrganizationView())
+    hass.http.register_view(OrganizationReadinessView())
     hass.data[DOMAIN][STATE_KEY] = state
+
+
+class OrganizationReadinessView(OrganizationView):
+    """Authenticated release/build readiness, not a mere open TCP port."""
+
+    url = "/api/ai_automation_suggester/readiness"
+    name = "api:ai_automation_suggester:readiness"
+
+    async def get(self, request):
+        from homeassistant.const import __version__
+
+        state = self.state(request)
+        return self.json({"ready": True, "build": state.build, "ha_version": __version__,
+                          "store_schema": 1, "mode": "organization_preview",
+                          "registry_mutation_enabled": False, "active_entries": len(state.active_entries)})
+
+    async def post(self, request):
+        self.state(request)
+        raise web.HTTPMethodNotAllowed("POST", ["GET"])
+
+
+async def async_activate_organization(hass, entry_id):
+    """Show the audit in the HA sidebar while at least one entry is loaded."""
+    from homeassistant.components.panel_custom import async_register_panel
+
+    state = hass.data[DOMAIN][STATE_KEY]
+    if not state.active_entries:
+        await async_register_panel(hass, frontend_url_path=PANEL_PATH,
+                                   webcomponent_name="home-intelligence-card",
+                                   sidebar_title="Home Intelligence", sidebar_icon="mdi:home-search",
+                                   module_url="/ai_automation_suggester/home-intelligence-card.js",
+                                   require_admin=True)
+    state.active_entries.add(entry_id)
+
+
+def async_deactivate_organization(hass, entry_id):
+    from homeassistant.components.frontend import async_remove_panel
+
+    state = hass.data[DOMAIN][STATE_KEY]
+    state.active_entries.discard(entry_id)
+    if not state.active_entries:
+        async_remove_panel(hass, PANEL_PATH)
