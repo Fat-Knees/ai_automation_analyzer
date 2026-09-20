@@ -161,7 +161,7 @@ all been live validated. The large household inventory also exposes UI usability
 work: long expanded lists and excessive location questions need prioritization
 and filtering before treating the interface as complete.
 
-## Guided interface revision (not installed yet)
+## Guided interface revision (live verification below)
 
 Replaced the initial technical wall with Start here, Rooms, Observation and
 Advanced review navigation. The landing page explains what to do and clearly
@@ -199,3 +199,29 @@ test checks bounded pagination, non-fabricated coverage and exclusion deletion.
 Chrome desktop/mobile timeline checks pass; 171 local tests plus lint and Node
 pass. A real HA timeline endpoint/admin test is added for the next Linux CI run.
 This does not complete Recorder backfill, behavioral detection or recommendations.
+
+## Guided interface deployment verified
+
+The user approved exact build 07d394563ccba199f08a124d6ffd08c3c818e0cf,
+the recorded archive digest, a fresh encrypted backup and one restart.
+The completed backup was copied locally with matching SHA-256. The updater
+preserved previous code and passed installed-file verification and core check.
+Its one restart command timed out after 90 seconds (exit 1); no second restart
+or automatic rollback was attempted. Home Assistant subsequently reconnected.
+
+The old browser tab retained old JavaScript despite reloads. The server returned
+the correct new resource. Refreshing its filesystem timestamp did not resolve
+that tab; a new authenticated tab displayed Start here, Rooms, Observation and
+Advanced review correctly. Observation displayed the exact approved commit and
+Files verified: yes. Status was Paused, 1118 stored observations, zero queued,
+zero overflow losses. Collection was not enabled by this deployment; the origin
+of observations added since the earlier zero-count check was not investigated.
+Do not claim the store remained empty. The new tab was left on Start here.
+The bounded redacted 200-line log summary contained no component error lines.
+This verifies this UI update, not all Home Intelligence requirements.
+
+Development-only commit 5edf87274dacb402e32c65c3407f2ed53e46c9cc passed
+GitHub unit run 35544959107 and Linux HA/runtime/frontend run 35544959098.
+Its activity timeline/backend changes have not been deployed. Recorder backfill,
+behavior discovery, recommendation evidence and controlled application remain
+unfinished. No additional production restart or collection permission is implied.
