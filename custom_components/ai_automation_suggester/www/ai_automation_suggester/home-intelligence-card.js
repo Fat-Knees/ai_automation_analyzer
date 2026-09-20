@@ -63,6 +63,12 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .diff > div { background: var(--secondary-background-color, #f8f9fa); border-radius: 4px; padding: 6px; overflow-wrap: anywhere; }
 .empty { color: var(--secondary-text-color, #5f6368); padding: 8px 0; }
 .footer-note { margin-top: 14px; }
+.welcome { padding: 22px; background: var(--secondary-background-color, #f4f7fb); border-radius: 12px; margin-bottom: 16px; }
+.welcome p { margin: 12px 0; max-width: 65ch; }
+.navigation { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.navigation [aria-pressed="true"] { outline: 2px solid var(--primary-color, #03a9f4); outline-offset: 2px; }
+details { margin: 12px 0; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
 @media (max-width: 700px) {
   .grid, .grid.three, .explorer, .form-grid, .diff { grid-template-columns: 1fr; }
   ha-card { padding: 12px; }
@@ -153,6 +159,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     this._loaded = false;
     this._error = null;
     this._root = null;
+    this._view = "start";
     if (typeof this.attachShadow === "function") {
       this._root = this.attachShadow({ mode: "open" });
       const style = document.createElement("style");
@@ -400,8 +407,8 @@ class HomeIntelligenceCard extends HTMLElementBase {
 
   _renderLayout() {
     const section = this._make("section", undefined, "panel");
-    section.append(this._make("h2", "Confirmed home layout"));
-    section.append(this._make("p", "Describe physical spaces you know. Saving confirms these facts for analysis; it does not change Home Assistant areas. Leave uncertain spaces out. Existing areas selected first are the proposed canonical area when consolidating.", "muted"));
+    section.append(this._make("h2", "Tell us about your home"));
+    section.append(this._make("p", "Optional: describe your rooms and anything unusual, such as a portable sensor or a plug controlling lights in another room. Save this as a note for future analysis. This version does not automatically turn your description into room assignments.", "muted"));
     const descriptionLabel = this._make("label", "Home description and exceptions");
     const description = document.createElement("textarea");
     description.value = this._layout.description;
@@ -410,6 +417,19 @@ class HomeIntelligenceCard extends HTMLElementBase {
     description.addEventListener("input", () => { this._layout.description = description.value; });
     descriptionLabel.append(description);
     section.append(descriptionLabel);
+    section.append(this._make("p", "Use the structured fields below only if you want to record confirmed rooms now. You can leave them empty. Saving here records your plan; it does not rename or move anything in Home Assistant.", "muted"));
+    if (!this._layout.areas.length && !this._layout.floors.length && this._data.inventory.areas.length && this._data.inventory.areas.length <= 100 && this._data.inventory.floors.length <= 100) {
+      section.append(this._button("Start from my existing rooms", () => {
+        const floorKeys = new Map(this._data.inventory.floors.map(floor => [floor.id, crypto.randomUUID()]));
+        this._layout.floors = this._data.inventory.floors.map(floor => ({ key: floorKeys.get(floor.id), name: floor.name }));
+        this._layout.areas = this._data.inventory.areas.map(area => ({
+          key: crypto.randomUUID(), name: area.name, floor_key: floorKeys.get(area.floor_id) || null,
+          aliases: [], registry_area_ids: [area.id], outdoor: false,
+        }));
+        this.render();
+      }, { className: "secondary" }));
+      section.append(this._make("p", "Copies the list into an editable draft. Check it before saving, and mark outdoor spaces yourself.", "muted"));
+    }
     for (const floor of this._layout.floors) {
       const row = this._make("div", undefined, "form-grid");
       row.append(this._layoutInput("Physical floor name", floor.name, (value) => { floor.name = value; }));
@@ -854,13 +874,69 @@ class HomeIntelligenceCard extends HTMLElementBase {
     return section;
   }
 
+  _navigate(view) {
+    this._view = view;
+    this.render();
+    this._root.querySelector("h2")?.focus();
+  }
+
+  _disclosure(title, child) {
+    const details = this._make("details");
+    details.append(this._make("summary", title), child);
+    return details;
+  }
+
+  _renderStart() {
+    const section = this._make("section", undefined, "welcome");
+    const title = this._make("h2", "Start with your rooms");
+    title.tabIndex = -1;
+    section.append(title);
+    section.append(this._make("p", "Home Intelligence will use your rooms and device activity to help suggest useful automations. This early version can review your home organization and record optional observations. Automatic behavior analysis and new AI recommendations are not ready yet."));
+    section.append(this._make("p", "For now, just check whether the room names match your home. You do not need to assign every sensor or answer hundreds of questions. Phones, weather, and whole-home devices can stay without a room."));
+    section.append(this._button("Review my rooms", () => this._navigate("rooms")));
+    section.append(this._make("p", "Nothing on this page turns devices on or changes your existing automations. Room edits are saved as plans only.", "muted"));
+    const steps = this._make("div", undefined, "grid three");
+    for (const [heading, text] of [
+      ["1. Review your rooms", "Available now. Check the room list and optionally describe anything that needs correcting."],
+      ["2. Choose what to observe", "Optional. Local collection is separate from room review and pauses after each restart."],
+      ["3. Review automation ideas", "Still in development. Collecting data does not yet produce behavior-based recommendations."],
+    ]) {
+      const item = this._make("div", undefined, "panel");
+      item.append(this._make("h3", heading), this._make("p", text));
+      steps.append(item);
+    }
+    section.append(steps);
+    return section;
+  }
+
+  _renderRooms() {
+    const section = this._make("section", undefined, "panel");
+    const title = this._make("h2", "Your rooms in Home Assistant");
+    title.tabIndex = -1;
+    section.append(title);
+    section.append(this._make("p", "These are existing room assignments, not guesses. Check the names first. Expand a room only when you want to inspect its devices. One device can expose many readings and controls, called entities."));
+    const inventory = this._data.inventory;
+    const floors = new Map(inventory.floors.map(floor => [String(floor.id), floor]));
+    for (const area of inventory.areas) {
+      const members = inventory.entities.filter(entity => entity.area_id === area.id);
+      const list = this._make("ul");
+      for (const entity of members) list.append(this._make("li", entityLabel(entity)));
+      if (!members.length) list.append(this._make("li", "No readings or controls assigned yet."));
+      section.append(this._disclosure(`${display(area.name)} · ${floorLabel(area.floor_id, floors)} · ${members.length} readings and controls`, list));
+    }
+    if (!inventory.areas.length) section.append(this._empty("No rooms are configured in Home Assistant yet. You can describe your home below."));
+    section.append(this._make("p", "Some items have no room, which can be intentional. Leave phones, shared services and portable devices alone unless you know a fixed location.", "muted"));
+    section.append(this._renderLayout());
+    return section;
+  }
+
   render() {
     if (!this._root) return;
     const content = document.createElement("div");
     const heading = this._make("div", undefined, "toolbar");
     const title = this._make("div");
     title.append(this._make("h1", display(this._config.title, "Home intelligence")));
-    title.append(this._make("p", "Organization audit and safe preview", "muted"));
+    title.append(this._make("p", "Understand your home before automating it", "muted"));
     heading.append(title);
     heading.append(this._button(this._loading ? "Refreshing…" : "Refresh", () => this.fetchData(), { className: "secondary", disabled: this._loading }));
     content.append(heading);
@@ -876,17 +952,28 @@ class HomeIntelligenceCard extends HTMLElementBase {
     if (this._error && !this._data) content.append(this._renderNotice(`${this._error} Use Refresh to try again.`, "notice error"));
     if (this._data) {
       if (this._error) content.append(this._renderNotice("The data shown below may be stale. Refresh before reviewing or saving.", "notice warning"));
-      if (!this._data.mutation_enabled) content.append(this._renderNotice("Live mutations are disabled by the server. This card only prepares and saves reviewable previews.", "notice"));
-      content.append(this._renderStructure());
-      content.append(this._renderExplorer());
-      content.append(this._renderAreaEditor());
-      content.append(this._renderLayout());
-      content.append(this._renderObservation());
-      content.append(this._renderProposals());
-      content.append(this._renderQuestions());
-      content.append(this._renderImpacts());
-      content.append(this._renderLimitations());
-      content.append(this._renderActions());
+      const nav = this._make("nav", undefined, "navigation");
+      nav.setAttribute("aria-label", "Home Intelligence sections");
+      for (const [view, label] of [["start", "Start here"], ["rooms", "Rooms"], ["observation", "Observation"], ["advanced", "Advanced review"]]) {
+        const button = this._button(label, () => this._navigate(view), { className: "secondary" });
+        button.setAttribute("aria-pressed", String(this._view === view));
+        nav.append(button);
+      }
+      content.append(nav);
+      if (this._view === "start") content.append(this._renderStart());
+      if (this._view === "rooms") content.append(this._renderRooms());
+      if (this._view === "observation") {
+        content.append(this._renderNotice("This is optional. Observation records selected device changes locally; it does not yet generate automation recommendations. You can leave it paused while reviewing your rooms."));
+        content.append(this._renderObservation());
+      }
+      if (this._view === "advanced") {
+        content.append(this._renderNotice("Optional tools for inspecting individual readings and proposed changes. You can skip this entire section. Save preview keeps a draft; it does not apply changes to Home Assistant."));
+        content.append(this._renderStructure(), this._renderExplorer(), this._renderAreaEditor(), this._renderProposals());
+        content.append(this._disclosure("Unresolved location questions — optional", this._renderQuestions()));
+        content.append(this._disclosure("Effects on existing automation targets", this._renderImpacts()));
+        content.append(this._disclosure("Technical limitations", this._renderLimitations()));
+        content.append(this._renderActions());
+      }
     } else if (this._loading) content.append(this._renderNotice("Loading the current organization and proposed changes…", "notice"));
     this._root.replaceChildren(this._root.querySelector("style"), content);
   }

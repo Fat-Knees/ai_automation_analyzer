@@ -1,5 +1,13 @@
 # Development first-install recovery
 
+The separate `tools/hi/update_frontend.py` supports an exact-build frontend-only
+update. It requires both validated archives, permits only the Home Intelligence
+JavaScript file to differ, and leaves owned data untouched. The prior component
+is preserved in `.hi-quarantine/ui-previous-<session>`. Before restarting, failures
+restore that hash-verified prior tree; conflicting edits block restoration.
+After a restart attempt, inspect health and hashes before any recovery. The tool
+does not retry an uncertain restart. This is not general backend upgrade support.
+
 Only the first installation into an absent integration directory is supported by
 the current tooling. An existing installation is refused. Upgrade/store-schema
 migration and complete post-start health automation remain unfinished.

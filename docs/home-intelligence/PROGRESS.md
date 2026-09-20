@@ -160,3 +160,26 @@ readiness HTTP endpoint, live collection, restore and full M0-M6 behavior have n
 all been live validated. The large household inventory also exposes UI usability
 work: long expanded lists and excessive location questions need prioritization
 and filtering before treating the interface as complete.
+
+## Guided interface revision (not installed yet)
+
+Replaced the initial technical wall with Start here, Rooms, Observation and
+Advanced review navigation. The landing page explains what to do and clearly
+states that behavior-based recommendations are unfinished. Rooms show existing
+assignments with collapsed member lists. Users can copy existing rooms/floors
+into an editable draft without writes, then explicitly save confirmed facts.
+Location questions and target-impact details are optional disclosures.
+Draft/review behavior and backend approval gates remain intact.
+
+Chrome 153 desktop 1280px and mobile 390px checks passed: guided navigation,
+initially hidden technical controls, inert injected text, proposal decisions,
+preview persistence, layout saves, no horizontal overflow, and room import with
+zero POSTs until confirmation. Local suite: 170 tests passed, lint and Node passed.
+Linux candidate CI is pending. Production still runs the prior 77727c1 build.
+
+Added a narrowly scoped frontend-only update tool. It refuses backend, schema or
+license changes, verifies the exact installed tree, preserves previous code, and
+restores verified code on pre-restart failures. Seven fake-remote/change-scope
+tests cover success, configuration failure, lost install/preserve/restart replies,
+changed prior files and backend-change refusal. Post-restart recovery remains a
+separate inspected operation; no uncertain restart is repeated automatically.

@@ -155,6 +155,13 @@ async function structurePanels(page) {
 
 async function runScenario(page, baseUrl, viewportLabel) {
   await loadCard(page, baseUrl);
+  await page.getByRole("heading", { name: "Start with your rooms" }).waitFor();
+  assert.equal(await page.getByRole("heading", { name: "Entity explorer" }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Start local observation" }).count(), 0);
+  await page.getByRole("button", { name: "Review my rooms", exact: true }).click();
+  await page.getByRole("heading", { name: "Your rooms in Home Assistant" }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Accept", exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Advanced review", exact: true }).click();
   const initialPanels = await structurePanels(page);
   assert.equal(initialPanels.length, 2, `${viewportLabel}: current and proposed structures render`);
   assert.match(initialPanels[0], /Office/);
@@ -196,6 +203,7 @@ async function runScenario(page, baseUrl, viewportLabel) {
   const savedText = await page.evaluate(() => document.querySelector("home-intelligence-card").shadowRoot.textContent);
   assert.match(savedText, /Revision rev-2/);
 
+  await page.getByRole("button", { name: "Rooms", exact: true }).click();
   await page.getByRole("button", { name: "Add physical space" }).click();
   await page.getByLabel("Physical space name", { exact: true }).fill("Backyard");
   await page.getByLabel("Outdoor space", { exact: true }).check();
@@ -225,6 +233,15 @@ async function runScenario(page, baseUrl, viewportLabel) {
       .slice(0, 8);
   }) : [];
   assert.ok(geometry.documentWidth <= geometry.viewportWidth + 1, `${viewportLabel}: no horizontal overflow (${geometry.documentWidth} > ${geometry.viewportWidth}); overflowers=${JSON.stringify(overflowers)}`);
+  await loadCard(page, baseUrl);
+  await page.getByRole("button", { name: "Review my rooms", exact: true }).click();
+  await page.getByRole("button", { name: "Start from my existing rooms", exact: true }).click();
+  const imported = await page.evaluate(() => window.__card._layout);
+  assert.equal(imported.areas.length, 2);
+  assert.equal(imported.floors.length, 1);
+  assert.deepEqual(imported.areas.map(area => area.registry_area_ids), [["area-office"], ["area-garage"]]);
+  assert.ok(imported.areas.every(area => area.floor_key === imported.floors[0].key && !area.outdoor));
+  assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.method === "POST").length, 0, "import only prepares a draft");
   return { viewportLabel, callCount: calls.length, geometry };
 }
 

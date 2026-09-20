@@ -26,6 +26,8 @@ def _load_tool(name: str):
 build = _load_tool("build")
 sys.modules["build"] = build
 release = _load_tool("release")
+sys.modules["release"] = release
+frontend_update = _load_tool("update_frontend")
 logs = _load_tool("logs")
 
 
@@ -122,6 +124,71 @@ class FakeRemote:
     def restart(self):
         self.calls.append("restart")
         return self.restarts.pop(0) if self.restarts else False
+
+
+@pytest.mark.parametrize("failure", [None, "check", "install", "preserve-lost", "restart-lost", "changed-old"])
+def test_ui_update_preserves_prior_code_and_bounds_restart(tmp_path, failure):
+    artifact = tmp_path / "ui.tar.gz"
+    artifact.write_bytes(b"synthetic archive")
+    previous = {"license_sha256": "license", "files": {frontend_update.FRONTEND: "old", "backend.py": "unchanged"}}
+    candidate = {"commit": "new", "license_sha256": "license", "files": {frontend_update.FRONTEND: "new", "backend.py": "unchanged"},
+                 "_archive_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()}
+
+    class Remote(FakeRemote):
+        preserved = False
+
+        def preserve_previous(self, session):
+            self.calls.append("preserve")
+            self.preserved, self.exists = True, False
+            if failure == "preserve-lost":
+                raise release.RemoteOperationUnknown("preserve reply lost")
+
+        def install_candidate(self, staged):
+            super().install_candidate(staged)
+            if failure == "install":
+                raise release.RemoteOperationUnknown("install reply lost")
+
+        def _verify_tree(self, destination, marker):
+            assert marker is previous
+            self.calls.append("verify-preserved")
+
+        def verify_installed(self, marker):
+            if failure == "changed-old":
+                raise release.ReleaseError("prior files changed")
+            super().verify_installed(marker)
+
+        def inspect_swap(self, destination):
+            return ({"preserved"} if self.preserved else set()) | ({"installed"} if self.exists else set())
+
+        def restore_previous(self, destination, marker):
+            self.calls.append("restore")
+            self.preserved, self.exists = False, True
+
+        def restart(self):
+            self.calls.append("restart")
+            if failure == "restart-lost":
+                raise release.RemoteOperationUnknown("restart reply lost")
+            return True
+
+    remote = Remote(exists=True, check_ok=failure != "check")
+    if failure:
+        with pytest.raises(release.ReleaseError):
+            frontend_update.update(remote, artifact, previous, candidate, _approval(artifact))
+        assert remote.calls.count("restart") == (1 if failure == "restart-lost" else 0)
+        assert ("restore" in remote.calls) == (failure in {"check", "install", "preserve-lost"})
+    else:
+        result = frontend_update.update(remote, artifact, previous, candidate, _approval(artifact))
+        assert result["status"] == "updated-awaiting-browser-verification"
+        assert remote.preserved and remote.exists
+        assert remote.calls.count("restart") == 1
+    assert remote.calls[-1] == "unlock"
+
+
+def test_ui_update_refuses_backend_or_schema_changes():
+    old = {"files": {frontend_update.FRONTEND: "old", "store.py": "schema1"}, "license_sha256": "same"}
+    new = {"files": {frontend_update.FRONTEND: "new", "store.py": "schema2"}, "license_sha256": "same"}
+    with pytest.raises(release.ReleaseError, match="only"):
+        frontend_update.validate_ui_change(old, new)
 
 
 def test_build_is_deterministic_and_validates_marker(tmp_path: Path):
