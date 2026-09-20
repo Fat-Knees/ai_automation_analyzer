@@ -110,3 +110,21 @@ opt-in observer's collection, selected attributes, privacy filtering and unload.
 Unit suite: 154 tests passed locally, exit 0. Browser desktop/mobile passed.
 Pending small follow-up: finite numeric attribute filtering, HA shutdown draining
 and installed-build display in the authenticated panel.
+
+## First install candidate
+
+Commit: 77727c132fef53acb760ee3b0f7248413a6642d4.
+Archive SHA-256: 871ea68dde72bc10c6c7c20b5ea70bbd0364a681902bcd86f4da294222507d9e.
+Linux HA and browser run: https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35542821446
+All jobs passed. Downloaded the CI artifact and verified the packaged tar.gz is
+byte-for-byte identical to the local candidate. Extra local store-cap and
+attribute-filter tests passed; the local wrapper ran 156 tests plus lint/frontend
+successfully with the runtime skip explicitly labeled. An additional redacted-log
+summary test subsequently passed with the release suite (19 tests).
+
+Remote read-only CLI help verified BusyBox tar requires its documented `-o` flag
+for owner suppression; installer now uses that flag. `ha core logs --lines 200`
+is supported. The diagnostic helper emits only counts and allowlisted exception
+types, never raw household messages. Production installation remains unapproved
+at the time this record was written; the owner has been asked about this exact
+candidate. Full M0-M6 scope remains incomplete as listed above.

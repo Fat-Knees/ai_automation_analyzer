@@ -62,3 +62,28 @@ def test_cursor_keeps_same_timestamp_events_and_checkpoint_never_rewinds(store):
     assert len({row["id"] for row in first + second}) == 4
     store.append([], job="live", checkpoint=90, mappings={})
     assert store.diagnostics()["checkpoints"]["live"] == 100
+
+
+def test_database_cap_failure_preserves_committed_checkpoint(tmp_path):
+    store = HistoryStore(tmp_path / "capped.sqlite", cap_bytes=1024 * 1024)
+    store.initialize()
+    last_committed = None
+    for batch_number in range(40):
+        events = [observation(f"registry-{i}", batch_number * 500 + i, "on", {"brightness": i % 255}) for i in range(500)]
+        try:
+            store.append(events, job="live", checkpoint=batch_number, mappings={})
+        except sqlite3.OperationalError as err:
+            assert "full" in str(err).lower()
+            break
+        last_committed = batch_number
+    else:
+        pytest.fail("The configured database cap was not reached")
+    assert store.path.stat().st_size <= 1024 * 1024
+    assert store.diagnostics()["checkpoints"]["live"] == last_committed
+    with sqlite3.connect(store.path) as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+
+
+def test_nonfinite_or_text_attribute_values_are_not_persisted():
+    event = observation("registry-a", 100, "on", {"brightness": float("nan"), "humidity": "private text", "unit_of_measurement": "x" * 100})
+    assert event["attributes"] == {}

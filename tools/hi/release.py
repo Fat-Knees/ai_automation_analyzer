@@ -517,7 +517,7 @@ class SSHRemote:
         if actual != expected:
             raise ReleaseError("remote archive listing does not exactly match the approved component files")
         self._run(
-            f"set -eu; tar --no-same-owner --no-same-permissions -xzf {shlex.quote(staged)} -C {shlex.quote(candidate)}; "
+            f"set -eu; tar -o --no-same-permissions -xzf {shlex.quote(staged)} -C {shlex.quote(candidate)}; "
             f"test ! -L {shlex.quote(candidate + '/' + COMPONENT_REL)}; "
             f"test -f {shlex.quote(candidate + '/' + COMPONENT_REL + '/_build.json')}; "
             f"test -f {shlex.quote(candidate + '/LICENSE')}; "

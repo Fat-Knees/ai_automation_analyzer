@@ -26,6 +26,7 @@ def _load_tool(name: str):
 build = _load_tool("build")
 sys.modules["build"] = build
 release = _load_tool("release")
+logs = _load_tool("logs")
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -286,6 +287,15 @@ def test_failed_recovery_reports_both_restart_attempts(tmp_path):
     assert result.restarted == 2
     assert result.status == "rollback-quarantined-restart-failed"
     assert not remote.exists
+
+
+def test_log_summary_never_returns_household_message_content():
+    raw = "ERROR [custom_components.ai_automation_suggester.observation] ValueError token=private-token coordinates=12.34,56.78\nERROR [unrelated] private-password"
+    result = logs.summarize(raw)
+    assert result["component_lines"] == 1
+    assert result["exception_types"] == ["ValueError"]
+    assert "private" not in json.dumps(result)
+    assert "12.34" not in json.dumps(result)
 
 
 def test_restart_timeout_does_not_trigger_an_immediate_second_restart(tmp_path: Path):
