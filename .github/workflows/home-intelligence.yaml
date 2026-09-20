@@ -26,7 +26,7 @@ jobs:
           python --version
           python -m pip show homeassistant pytest-homeassistant-custom-component
       - name: Run real HA suite separately from upstream stubs
-        run: python -m pytest -q runtime_tests --junitxml=runtime-results.xml
+        run: python -m pytest -q runtime_tests -o asyncio_mode=auto --junitxml=runtime-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
