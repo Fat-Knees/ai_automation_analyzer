@@ -9,9 +9,13 @@
       "unit_tests": [
         "tests/test_organization.py"
       ],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Partial: local-entry lifecycle, inventory/child inheritance, admin access, preview persistence and stale revisions."
     },
     {
       "requirement": "HI-02",
@@ -23,9 +27,13 @@
       "unit_tests": [
         "tests/test_organization.py"
       ],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Partial: local-entry lifecycle, inventory/child inheritance, admin access, preview persistence and stale revisions."
     },
     {
       "requirement": "HI-03",
@@ -178,9 +186,13 @@
       "status": "partial",
       "implementation": [],
       "unit_tests": [],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Partial: local-entry lifecycle, inventory/child inheritance, admin access, preview persistence and stale revisions."
     },
     {
       "requirement": "HI-18",
@@ -191,5 +203,13 @@
       "live_validated": false,
       "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
     }
-  ]
+  ],
+  "verification": {
+    "code_commit": "4b6ba4fe631f9ba45ec5a9d0aa62ad896631bd4f",
+    "ha_version": "2026.9.3",
+    "python_version": "3.14.2",
+    "runtime_tests_passed": 3,
+    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35539633985",
+    "scope": "Bounded runtime slice; no full requirement completion or live validation."
+  }
 }

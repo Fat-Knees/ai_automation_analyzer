@@ -28,10 +28,18 @@ write or device control occurred.
 
 Release metadata confirms Core 2026.9.3 needs Python >=3.14.2. The separate Linux
 workflow pins Python 3.14.2, Home Assistant 2026.9.3 and
-pytest-homeassistant-custom-component 0.13.366. The runtime suite is written but
-**not run**: Git push failed because the local Git client is not signed in; the
-connected GitHub app also reports `push: false`. Enabling Actions did not grant
-repository write credentials. User sign-in/push is required to execute that job.
+pytest-homeassistant-custom-component 0.13.366. User sign-in resolved the Git push
+blocker. The first run exposed missing async fixture handling; the runtime command
+now explicitly uses `-o asyncio_mode=auto`.
+
+Verified code commit: `4b6ba4fe631f9ba45ec5a9d0aa62ad896631bd4f`.
+[Linux runtime run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35539633985):
+**3 passed in 0.36s**, exit 0, on Python 3.14.2 / HA 2026.9.3. Tests exercise real
+config-entry setup/reload/unload, registry and child-device inheritance, persisted
+virtual previews without registry mutation, stale revisions, and non-admin denial.
+The frontend job passed in that run. The separate
+[unit/lint run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35539633944)
+also passed. These bounded tests do not complete every acceptance scenario.
 
 During release-source review, fixed the new and existing HTTP views to use HA's
 typed `KEY_HASS` application key. Also distinguished native child-device area
@@ -45,8 +53,8 @@ inheritance from gateway `via_device` relationships. Both are relevant to 2026.9
   YAML includes, blueprint and external dependency reporting.
 - Continuous identity mapping, deletion/recreation lifecycle and migration tests.
 - Paginated discovery for installations beyond the explicit inventory cap.
-- Full browser accessibility/mobile testing, performance measurements and genuine
-  HA lifecycle/security tests passing on the declared target version.
+- Full browser accessibility/mobile testing, performance measurements and broader
+  HA lifecycle/security acceptance coverage beyond the three passing runtime tests.
 
 ## Remaining milestones
 
