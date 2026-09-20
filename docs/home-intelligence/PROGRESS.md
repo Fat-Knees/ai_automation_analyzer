@@ -225,3 +225,28 @@ GitHub unit run 35544959107 and Linux HA/runtime/frontend run 35544959098.
 Its activity timeline/backend changes have not been deployed. Recorder backfill,
 behavior discovery, recommendation evidence and controlled application remain
 unfinished. No additional production restart or collection permission is implied.
+
+## Chrome stale-interface repair prepared
+
+The user supplied a screenshot of the old Organization preview interface and
+confirmed the exact /home-intelligence address. Reloading and opening a new tab
+in their normal Chrome did not solve it. The server independently returns the
+new guided JavaScript and installed build 07d3945. Earlier in-app verification
+does not establish correct rendering in the user's Chrome.
+
+Prepared isolated branch codex/panel-cache-fix from the installed 07d3945 build.
+Candidate a10fb4e87da8f2286a409fa6af776f29ec76e224 changes only panel registration
+to include the release commit in the JavaScript URL. It does not include the
+unreleased history timeline. Archive SHA-256:
+96c6eb4e3cad330569eb43d790c2358d4b9cb7cd3b25a6ea904a627345c9be3d.
+171 local tests, Ruff and Node pass. GitHub unit run 35545782603 and the frontend
+job of runtime run 35545782579 passed; the HA job is still pending completion.
+No production repair or additional restart has been performed. Exact-build
+approval is still required. Main development branch contains the same fix as
+daa900a; its 172-test suite also passed. The existing UI-only updater intentionally
+refuses this API-file change; installation must preserve equivalent verification,
+backup, pre-restart restoration and no-repeat-on-uncertain-restart behavior.
+
+Final cache-fix CI result: both run 35545782603 (unit) and run 35545782579
+(Linux HA plus desktop/mobile frontend) completed successfully. Exact-build
+repair approval was requested; installation is pending the user's answer.
