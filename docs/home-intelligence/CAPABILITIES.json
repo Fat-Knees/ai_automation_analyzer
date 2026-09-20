@@ -205,11 +205,12 @@
     }
   ],
   "verification": {
-    "code_commit": "4b6ba4fe631f9ba45ec5a9d0aa62ad896631bd4f",
+    "code_commit": "0e9a1a87f28266e0d5a2704a3814439a6fbc4c15",
     "ha_version": "2026.9.3",
     "python_version": "3.14.2",
-    "runtime_tests_passed": 3,
-    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35539633985",
-    "scope": "Bounded runtime slice; no full requirement completion or live validation."
+    "runtime_tests_passed": 4,
+    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35540710375",
+    "scope": "Bounded runtime slice; no full requirement completion or live validation.",
+    "browser": "Chrome 153.0.8010.48; synthetic desktop 1280px and mobile 390px audit checks passed"
   }
 }

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from homeassistant.helpers.http import KEY_HASS
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+from .layout import validate_layout
 from .organization import build_audit, classify, overlay
 
 LOCAL_PROVIDER = "Local audit (no AI)"
@@ -29,7 +32,19 @@ def read_build():
     if not marker.exists():
         return {"commit": None, "format_version": 1, "source": "development"}
     metadata = json.loads(marker.read_text(encoding="utf-8"))
-    return {"commit": metadata["commit"], "format_version": metadata["format_version"], "source": "release"}
+    if metadata.get("format_version") != 1 or not re.fullmatch(r"[0-9a-f]{40}", str(metadata.get("commit", ""))):
+        raise ValueError("Invalid release identity")
+    files = metadata.get("files")
+    if not isinstance(files, dict) or not files or len(files) > 500:
+        raise ValueError("Invalid release file manifest")
+    root = marker.parent.resolve()
+    for name, digest in files.items():
+        path = root / name
+        if not isinstance(name, str) or "\\" in name or path.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ValueError("Invalid release file path")
+        if not path.is_file() or path.stat().st_size > 10_000_000 or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError("Release files do not match the tested build")
+    return {"commit": metadata["commit"], "format_version": metadata["format_version"], "source": "release", "files_verified": True}
 
 
 def definition_snapshot(value, budget, depth=0):
@@ -198,7 +213,7 @@ class OrganizationView(HomeAssistantView):
                 if set(reviews) - {p["id"] for p in report["proposals"]}:
                     raise ValueError("Unknown proposal review")
                 overlay(report["inventory"], body["operations"])
-                preferences = {"operations": body["operations"], "reviews": reviews}
+                preferences = {**state.data["preferences"], "operations": body["operations"], "reviews": reviews}
                 old = state.data["preferences"]
                 state.data["preferences"] = preferences
                 try:
@@ -223,7 +238,39 @@ async def async_setup_organization(hass):
         str(Path(__file__).parent / "www" / "ai_automation_suggester" / "home-intelligence-card.js"), False)])
     hass.http.register_view(OrganizationView())
     hass.http.register_view(OrganizationReadinessView())
+    hass.http.register_view(OrganizationLayoutView())
     hass.data[DOMAIN][STATE_KEY] = state
+
+
+class OrganizationLayoutView(OrganizationView):
+    """Save explicitly confirmed physical facts separately from proposed edits."""
+
+    url = "/api/ai_automation_suggester/layout"
+    name = "api:ai_automation_suggester:layout"
+
+    async def post(self, request):
+        state = self.state(request)
+        payload = bytearray()
+        async for chunk in request.content.iter_chunked(8192):
+            payload.extend(chunk)
+            if len(payload) > 65536:
+                raise web.HTTPRequestEntityTooLarge(max_size=65536, actual_size=len(payload))
+        try:
+            body = json.loads(payload)
+            if not isinstance(body, dict) or set(body) != {"revision", "layout"}:
+                raise ValueError("Expected revision and confirmed layout only")
+            async with state.lock:
+                report = await state.report()
+                if body["revision"] != report["revision"]:
+                    return self.json({"error": "Inventory or preview changed. Refresh before confirming layout."}, status_code=409)
+                layout = validate_layout(body["layout"], report["inventory"])
+                candidate = copy.deepcopy(state.data)
+                candidate["preferences"]["layout"] = layout
+                await state.store.async_save(candidate)
+                state.data = candidate
+                return self.json(await state.report())
+        except (ValueError, TypeError) as err:
+            return self.json({"error": str(err)}, status_code=400)
 
 
 class OrganizationReadinessView(OrganizationView):

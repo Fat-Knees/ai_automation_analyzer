@@ -39,8 +39,13 @@ p { line-height: 1.45; }
 .risk-high { color: var(--error-color, #b3261e); }
 .risk-medium { color: var(--warning-color, #8a5a00); }
 .explorer { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(0, 1.3fr); gap: 12px; }
+.explorer > *, .form-grid > *, label { min-width: 0; }
+.explorer select, .form-grid select, .form-grid input { width: 100%; box-sizing: border-box; }
 select, input { background: var(--card-background-color, #fff); border: 1px solid var(--divider-color, #aaa); border-radius: 4px; color: inherit; font: inherit; max-width: 100%; min-height: 36px; padding: 5px 8px; }
 label { display: flex; flex-direction: column; gap: 5px; font-size: .9rem; }
+textarea, fieldset { min-width: 0; max-width: 100%; box-sizing: border-box; }
+textarea { width: 100%; font: inherit; color: inherit; background: var(--card-background-color, #fff); }
+input[type="checkbox"] { width: auto; min-height: 20px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .actions { flex-wrap: wrap; margin-top: 10px; }
 button { background: var(--primary-color, #03a9f4); border: 0; border-radius: 4px; color: var(--text-primary-color, #fff); cursor: pointer; font: inherit; min-height: 36px; padding: 6px 12px; }
@@ -217,14 +222,19 @@ class HomeIntelligenceCard extends HTMLElementBase {
       impacts: asArray(payload.impacts),
       limitations: asArray(payload.limitations),
       mutation_enabled: payload.mutation_enabled === true,
+      layout: payload.layout || { description: "", floors: [], areas: [], entity_policies: {} },
+      layout_findings: asArray(payload.layout_findings),
     };
+    this._layout = clone(this._data.layout);
     this._draft = clone(this._data.proposed);
     this._operations = this._data.operations
       .filter((operation) => operation && operation.kind && operation.subject_id !== undefined)
       .map((operation) => ({ kind: operation.kind, subject_id: operation.subject_id, after: operation.after ?? null }));
     this._reviews = this._savedReviews();
     this._proposalOperationKeys = new Set();
-    for (const operation of this._operations) this._applyOperation(operation);
+    for (const proposal of this._data.proposals) {
+      if (this._reviews[proposal.id] === "accepted") this._proposalOperationKeys.add(operationKey(proposal));
+    }
     this._entityPage = 0;
     const entities = this._draft.entities;
     this._selectedEntityId = entities.some((entity) => entity.id === this._selectedEntityId)
@@ -254,10 +264,6 @@ class HomeIntelligenceCard extends HTMLElementBase {
       const entity = this._draft.entities.find((candidate) => String(candidate.id) === subjectId);
       if (entity) {
         entity.explicit_area_id = after;
-        // area_id is the effective placement. A null explicit override lets
-        // the server retain/infer device placement; keep it visible when the
-        // API supplied one rather than pretending it became unassigned.
-        if (after !== null) entity.area_id = after;
       }
     } else if (operation.kind === "area_name") {
       const area = this._draft.areas.find((candidate) => String(candidate.id) === subjectId);
@@ -268,11 +274,18 @@ class HomeIntelligenceCard extends HTMLElementBase {
     } else if (operation.kind === "device_area") {
       const device = this._draft.devices.find((candidate) => String(candidate.id) === subjectId);
       if (device) device.area_id = after;
-      for (const entity of this._draft.entities) {
-        if (String(entity.device_id) === subjectId && (entity.explicit_area_id === undefined || entity.explicit_area_id === null)) {
-          entity.area_id = after;
-        }
-      }
+    }
+  }
+
+  _rebuildDraft() {
+    this._draft = clone(this._data.inventory);
+    for (const operation of this._operations) this._applyOperation(operation);
+    const devices = new Map(this._draft.devices.map((device) => [device.id, device]));
+    for (const entity of this._draft.entities) {
+      const device = devices.get(entity.device_id);
+      const parent = devices.get(device?.parent_device_id);
+      const explicit = Object.hasOwn(entity, "explicit_area_id") ? entity.explicit_area_id : entity.area_id;
+      entity.area_id = explicit ?? device?.area_id ?? parent?.area_id ?? null;
     }
   }
 
@@ -292,6 +305,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     entity.explicit_area_id = areaId || null;
     if (areaId) entity.area_id = areaId;
     this._pushOperation("entity_area", entityId, areaId || null);
+    this._rebuildDraft();
   }
 
   _updateDraftArea(areaId, field, value) {
@@ -305,6 +319,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       area.floor_id = value || null;
       this._pushOperation("area_floor", areaId, value || null);
     }
+    this._rebuildDraft();
   }
 
   _reviewProposal(proposal, status) {
@@ -314,15 +329,15 @@ class HomeIntelligenceCard extends HTMLElementBase {
     if (status === "accepted" && operationKinds.has(proposal.kind) && proposal.subject_id !== undefined) {
       const operation = { kind: proposal.kind, subject_id: proposal.subject_id, after: proposal.after ?? null };
       this._pushOperation(operation.kind, operation.subject_id, operation.after);
-      this._applyOperation(operation);
       this._proposalOperationKeys.add(operationKey(operation));
     } else if (status === "rejected" && operationKinds.has(proposal.kind)) {
       const key = operationKey(proposal);
       if (this._proposalOperationKeys.has(key)) {
-        this._operations = this._operations.filter((operation) => operationKey(operation) !== key);
+        this._operations = this._operations.filter((operation) => operationKey(operation) !== key || operation.after !== (proposal.after ?? null));
         this._proposalOperationKeys.delete(key);
       }
     }
+    this._rebuildDraft();
     this.render();
   }
 
@@ -347,11 +362,114 @@ class HomeIntelligenceCard extends HTMLElementBase {
 
   resetPreview() {
     if (!this._data) return;
-    this._draft = clone(this._data.proposed);
+    this._draft = clone(this._data.inventory);
     this._operations = [];
-    this._reviews = this._savedReviews();
+    this._reviews = {};
     this._proposalOperationKeys = new Set();
     this.render();
+  }
+
+  async saveLayout() {
+    if (!this._hass || this._loading) return;
+    this._loading = true;
+    this._error = null;
+    this.render();
+    try {
+      const response = await this._hass.callApi("POST", "ai_automation_suggester/layout", {
+        revision: this._data.revision, layout: clone(this._layout),
+      });
+      this._setData(response);
+    } catch (error) {
+      this._error = errorMessage(error, "Unable to save the confirmed layout.");
+    } finally {
+      this._loading = false;
+      this.render();
+    }
+  }
+
+  _layoutInput(labelText, value, onChange) {
+    const label = this._make("label", labelText);
+    const input = document.createElement("input");
+    input.value = value;
+    input.maxLength = 100;
+    input.addEventListener("input", () => onChange(input.value));
+    label.append(input);
+    return label;
+  }
+
+  _renderLayout() {
+    const section = this._make("section", undefined, "panel");
+    section.append(this._make("h2", "Confirmed home layout"));
+    section.append(this._make("p", "Describe physical spaces you know. Saving confirms these facts for analysis; it does not change Home Assistant areas. Leave uncertain spaces out. Existing areas selected first are the proposed canonical area when consolidating.", "muted"));
+    const descriptionLabel = this._make("label", "Home description and exceptions");
+    const description = document.createElement("textarea");
+    description.value = this._layout.description;
+    description.maxLength = 4000;
+    description.rows = 3;
+    description.addEventListener("input", () => { this._layout.description = description.value; });
+    descriptionLabel.append(description);
+    section.append(descriptionLabel);
+    for (const floor of this._layout.floors) {
+      const row = this._make("div", undefined, "form-grid");
+      row.append(this._layoutInput("Physical floor name", floor.name, (value) => { floor.name = value; }));
+      row.append(this._button("Remove floor from plan", () => {
+        this._layout.floors = this._layout.floors.filter((item) => item.key !== floor.key);
+        for (const area of this._layout.areas) if (area.floor_key === floor.key) area.floor_key = null;
+        this.render();
+      }, { className: "secondary" }));
+      section.append(row);
+    }
+    section.append(this._button("Add physical floor", () => {
+      this._layout.floors.push({ key: crypto.randomUUID(), name: "" }); this.render();
+    }, { className: "secondary" }));
+    for (const area of this._layout.areas) {
+      const row = this._make("div", undefined, "panel form-grid");
+      row.append(this._layoutInput("Physical space name", area.name, (value) => { area.name = value; }));
+      row.append(this._layoutInput("Aliases (comma separated)", area.aliases.join(", "), (value) => {
+        area.aliases = value.split(",").map((item) => item.trim()).filter(Boolean);
+      }));
+      const floorLabel = this._make("label", "Physical floor (optional)");
+      const floorSelect = document.createElement("select");
+      for (const floor of [{ key: "", name: "No floor confirmed" }, ...this._layout.floors]) {
+        const option = this._make("option", floor.name || "Unnamed floor"); option.value = floor.key; floorSelect.append(option);
+      }
+      floorSelect.value = area.floor_key || "";
+      floorSelect.addEventListener("change", () => { area.floor_key = floorSelect.value || null; });
+      floorLabel.append(floorSelect); row.append(floorLabel);
+      const choices = this._make("fieldset");
+      choices.append(this._make("legend", "Existing HA areas for this same space"));
+      for (const existing of this._data.inventory.areas) {
+        const label = this._make("label", existing.name);
+        const checkbox = document.createElement("input"); checkbox.type = "checkbox";
+        checkbox.checked = area.registry_area_ids.includes(existing.id);
+        checkbox.addEventListener("change", () => {
+          area.registry_area_ids = area.registry_area_ids.filter((id) => id !== existing.id);
+          if (checkbox.checked) area.registry_area_ids.push(existing.id);
+        });
+        label.prepend(checkbox); choices.append(label);
+      }
+      row.append(choices);
+      const outdoorLabel = this._make("label", "Outdoor space");
+      const outdoor = document.createElement("input"); outdoor.type = "checkbox"; outdoor.checked = area.outdoor;
+      outdoor.addEventListener("change", () => { area.outdoor = outdoor.checked; });
+      outdoorLabel.prepend(outdoor); row.append(outdoorLabel);
+      row.append(this._button("Remove space from plan", () => {
+        this._layout.areas = this._layout.areas.filter((item) => item.key !== area.key); this.render();
+      }, { className: "secondary" }));
+      section.append(row);
+    }
+    const actions = this._make("div", undefined, "actions");
+    actions.append(this._button("Add physical space", () => {
+      this._layout.areas.push({ key: crypto.randomUUID(), name: "", aliases: [], floor_key: null, registry_area_ids: [], outdoor: false }); this.render();
+    }, { className: "secondary" }));
+    const unsavedPreview = JSON.stringify(this._operations) !== JSON.stringify(this._data.operations) || JSON.stringify(this._reviews) !== JSON.stringify(this._savedReviews());
+    actions.append(this._button("Confirm and save layout", () => this.saveLayout(), { disabled: this._loading || unsavedPreview }));
+    section.append(actions);
+    if (unsavedPreview) section.append(this._make("p", "Save or reset your preview edits before confirming layout.", "warning"));
+    for (const finding of this._data.layout_findings) {
+      section.append(this._make("p", `${finding.name}: ${finding.reason} Evidence: ${finding.evidence}`, finding.blocker ? "warning" : "muted"));
+    }
+    return section;
   }
 
   _make(tag, text, className) {
@@ -499,7 +617,24 @@ class HomeIntelligenceCard extends HTMLElementBase {
     });
     label.append(areaSelect);
     form.append(label);
+    const policy = this._layout.entity_policies[entity.id] || { location: "unknown", analysis: "automatic", privacy_excluded: false };
+    for (const [field, title, options] of [
+      ["location", "Physical placement policy", ["unknown", "fixed", "portable", "multi-room", "whole-house"]],
+      ["analysis", "Analysis preference", ["always", "high", "automatic", "low", "ignore"]],
+    ]) {
+      const policyLabel = this._make("label", title);
+      const select = document.createElement("select");
+      for (const value of options) { const option = this._make("option", value); option.value = value; select.append(option); }
+      select.value = policy[field];
+      select.addEventListener("change", () => { policy[field] = select.value; this._layout.entity_policies[entity.id] = policy; });
+      policyLabel.append(select); form.append(policyLabel);
+    }
+    const privacyLabel = this._make("label", "Exclude from future behavioral analysis and AI evidence");
+    const privacy = document.createElement("input"); privacy.type = "checkbox"; privacy.checked = policy.privacy_excluded;
+    privacy.addEventListener("change", () => { policy.privacy_excluded = privacy.checked; this._layout.entity_policies[entity.id] = policy; });
+    privacyLabel.prepend(privacy); form.append(privacyLabel);
     panel.append(form);
+    panel.append(this._make("p", "Placement and analysis preferences are saved with Confirm and save layout. Behavioral collection is not active in this build.", "muted"));
     return panel;
   }
 
@@ -645,6 +780,9 @@ class HomeIntelligenceCard extends HTMLElementBase {
   _renderImpacts() {
     const section = this._make("section", undefined, "panel");
     section.append(this._make("h2", "Automation target impact (static estimate)"));
+    if (JSON.stringify(this._operations) !== JSON.stringify(this._data.operations)) {
+      section.append(this._make("p", "Unsaved edits: save the preview to recalculate target changes. The report below describes the last saved preview.", "warning"));
+    }
     if (!this._data.impacts.length) {
       section.append(this._empty("No target impact report was returned."));
       return section;
@@ -712,6 +850,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       content.append(this._renderStructure());
       content.append(this._renderExplorer());
       content.append(this._renderAreaEditor());
+      content.append(this._renderLayout());
       content.append(this._renderProposals());
       content.append(this._renderQuestions());
       content.append(this._renderImpacts());

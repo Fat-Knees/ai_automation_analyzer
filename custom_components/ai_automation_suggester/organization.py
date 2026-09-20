@@ -10,6 +10,8 @@ import hashlib
 import json
 import re
 
+from .layout import empty_layout, layout_findings
+
 MAX_OPERATIONS = 200
 MAX_ACTION_NODES = 5000
 
@@ -211,6 +213,8 @@ def build_audit(inventory, definitions, preferences, limitations=()):
     for proposal in proposals:
         proposal["status"] = preferences.get("reviews", {}).get(proposal["id"], "pending")
     return {"revision": revision, "inventory": inventory, "proposed": proposed,
+            "layout": preferences.get("layout", empty_layout()),
+            "layout_findings": layout_findings(preferences.get("layout", empty_layout()), inventory),
             "operations": operations, "proposals": proposals, "questions": questions,
             "impacts": target_impacts(definitions, inventory, proposed),
             "limitations": warnings + ["Target sets are static estimates; service capabilities and dynamic references require runtime review.",

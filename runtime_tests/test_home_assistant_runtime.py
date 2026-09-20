@@ -1,4 +1,5 @@
 """Actual config-entry setup, registry inventory and authenticated HTTP tests."""
+import os
 from pathlib import Path
 
 import homeassistant.core
@@ -10,7 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components import ai_automation_suggester as integration
 from custom_components.ai_automation_suggester.const import CONFIG_VERSION, DOMAIN
-from custom_components.ai_automation_suggester.organization_api import STATE_KEY
+from custom_components.ai_automation_suggester.organization_api import STATE_KEY, OrganizationState
 
 pytestmark = pytest.mark.asyncio
 
@@ -53,6 +54,10 @@ async def test_readiness_and_card_resource(hass, hass_client):
     assert ready["store_schema"] == 1
     assert ready["registry_mutation_enabled"] is False
     assert ready["active_entries"] == 1
+    if expected_commit := os.environ.get("HI_EXPECTED_BUILD_COMMIT"):
+        assert ready["build"]["commit"] == expected_commit
+        assert ready["build"]["source"] == "release"
+        assert ready["build"]["files_verified"] is True
     response = await client.get("/ai_automation_suggester/home-intelligence-card.js")
     assert response.status == 200
     assert 'customElements.define("home-intelligence-card"' in await response.text()
@@ -98,12 +103,50 @@ async def test_real_registry_preview_and_stale_revision(hass, hass_client):
     await hass.config_entries.async_reload(entry.entry_id)
     response = await client.get("/api/ai_automation_suggester/organization")
     assert (await response.json())["operations"] == body["operations"]
+    restored = OrganizationState(hass)
+    await restored.load()
+    assert restored.data["preferences"]["operations"] == body["operations"]
+
+
+async def test_local_user_flow_needs_no_provider_key(hass):
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"}, data={"provider": "Local audit (no AI)"})
+    assert result["type"] == "create_entry"
+    assert result["data"] == {"provider": "Local audit (no AI)"}
+    await hass.async_block_till_done()
+
+
+async def test_confirmed_layout_persists_without_registry_mutation(hass, hass_client):
+    await setup_local(hass)
+    areas = area_registry.async_get(hass)
+    living = areas.async_create("Living Room")
+    lounge = areas.async_create("Lounge")
+    client = await hass_client()
+    report = await (await client.get("/api/ai_automation_suggester/organization")).json()
+    layout = {"description": "An open-plan living space", "floors": [], "entity_policies": {},
+              "areas": [{"key": "living", "name": "Living Room", "floor_key": None, "aliases": ["Lounge"],
+                         "registry_area_ids": [living.id, lounge.id], "outdoor": False}]}
+    body = {"revision": report["revision"], "layout": layout}
+    response = await client.post("/api/ai_automation_suggester/layout", json=body)
+    assert response.status == 200
+    saved = await response.json()
+    assert saved["layout"] == layout
+    assert saved["layout_findings"][0]["kind"] == "consolidation"
+    assert areas.async_get_area(lounge.id).name == "Lounge"
+    assert (await client.post("/api/ai_automation_suggester/layout", json=body)).status == 409
+    response = await client.post("/api/ai_automation_suggester/organization", json={
+        "revision": saved["revision"], "operations": [], "reviews": {}})
+    assert (await response.json())["layout"] == layout
+    restored = OrganizationState(hass)
+    await restored.load()
+    assert restored.data["preferences"]["layout"] == layout
 
 
 async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_access_token):
     await setup_local(hass)
     client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
+    assert response.status == 403
+    response = await client.post("/api/ai_automation_suggester/layout", json={})
     assert response.status == 403
     response = await client.get("/api/ai_automation_suggester/readiness")
     assert response.status == 403

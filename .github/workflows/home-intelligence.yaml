@@ -25,13 +25,32 @@ jobs:
         run: |
           python --version
           python -m pip show homeassistant pytest-homeassistant-custom-component
+          python -m pip freeze > runtime-dependencies.txt
+      - name: Build and stage the exact release artifact
+        run: |
+          mkdir -p .private-hi
+          python tools/hi/build.py --output-dir .private-hi/release > .private-hi/release.json
+          python - <<'PY'
+          import json, tarfile
+          from pathlib import Path
+          release = json.loads(Path('.private-hi/release.json').read_text())
+          with tarfile.open(release['artifact']) as archive:
+              archive.extractall('.', filter='data')
+          PY
       - name: Run real HA suite separately from upstream stubs
+        env:
+          HI_EXPECTED_BUILD_COMMIT: ${{ github.sha }}
         run: python -m pytest -q runtime_tests -o asyncio_mode=auto --junitxml=runtime-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ha-runtime-results
-          path: runtime-results.xml
+          path: |
+            runtime-results.xml
+            runtime-dependencies.txt
+            .private-hi/release.json
+            .private-hi/release/*.tar.gz
+          include-hidden-files: true
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -41,3 +60,9 @@ jobs:
         with:
           node-version: '22'
       - run: node --test frontend_tests/*.test.mjs
+      - name: Install browser test driver
+        run: npm install --prefix .private-hi/browser --no-save --ignore-scripts playwright@1.62.1
+      - name: Exercise desktop and mobile views in installed Chrome
+        env:
+          NODE_PATH: ${{ github.workspace }}/.private-hi/browser/node_modules
+        run: node frontend_tests/browser-smoke.cjs

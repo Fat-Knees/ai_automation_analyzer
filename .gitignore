@@ -9,6 +9,7 @@ __pycache__/
 htmlcov/
 .venv/
 venv/
+/dist/
 # MERGE into the existing .gitignore; do not replace upstream entries.
 /home-intelligence.local.json
 /.private-hi/

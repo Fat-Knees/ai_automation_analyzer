@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib
 import json
 import sys
@@ -119,6 +120,27 @@ def test_non_admin_is_rejected_before_state_lookup(api):
         api.OrganizationView.state(request)
 
     assert error.value.status == 403
+
+
+def test_release_readiness_verifies_payload_and_rejects_tampering(api, monkeypatch, tmp_path):
+    module = tmp_path / "organization_api.py"
+    module.write_text("# tested source\n", encoding="utf-8")
+    monkeypatch.setattr(api, "__file__", str(module))
+    marker = {"format_version": 1, "commit": "a" * 40,
+              "files": {module.name: hashlib.sha256(module.read_bytes()).hexdigest()}}
+    (tmp_path / "_build.json").write_text(json.dumps(marker), encoding="utf-8")
+    assert api.read_build()["files_verified"] is True
+    module.write_text("# changed after packaging\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="do not match"):
+        api.read_build()
+
+
+def test_release_marker_cannot_read_outside_component(api, monkeypatch, tmp_path):
+    monkeypatch.setattr(api, "__file__", str(tmp_path / "organization_api.py"))
+    marker = {"format_version": 1, "commit": "a" * 40, "files": {"../private-key": "b" * 64}}
+    (tmp_path / "_build.json").write_text(json.dumps(marker), encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid release file path"):
+        api.read_build()
 
 
 @pytest.mark.parametrize(
