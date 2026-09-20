@@ -4,7 +4,7 @@ from pathlib import Path
 import homeassistant.core
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.helpers import area_registry, device_registry, entity_registry
+from homeassistant.helpers import area_registry, device_registry, entity_registry, floor_registry, label_registry
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components import ai_automation_suggester as integration
@@ -41,19 +41,28 @@ async def test_actual_setup_reload_unload_without_provider(hass):
 async def test_real_registry_preview_and_stale_revision(hass, hass_client):
     entry = await setup_local(hass)
     areas = area_registry.async_get(hass)
-    office = areas.async_create("Synthetic Office")
+    floor = floor_registry.async_get(hass).async_create("Synthetic Ground")
+    label = label_registry.async_get(hass).async_create("Synthetic Label")
+    office = areas.async_create("Synthetic Office", floor_id=floor.floor_id, labels={label.label_id})
     bedroom = areas.async_create("Synthetic Bedroom")
     devices = device_registry.async_get(hass)
     device = devices.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, "synthetic-relay")}, name="Synthetic relay")
     devices.async_update_device(device.id, area_id=office.id)
+    child = devices.async_get_or_create_child(config_entry_id=entry.entry_id,
+                                             identifiers={(DOMAIN, "synthetic-child")},
+                                             parent_device_id=device.id, name="Synthetic child")
     entities = entity_registry.async_get(hass)
     entity = entities.async_get_or_create("switch", DOMAIN, "synthetic-desk", device_id=device.id)
+    child_entity = entities.async_get_or_create("sensor", DOMAIN, "synthetic-child-sensor", device_id=child.id)
     client = await hass_client()
     response = await client.get("/api/ai_automation_suggester/organization")
     assert response.status == 200
     report = await response.json()
     actual = next(row for row in report["inventory"]["entities"] if row["id"] == entity.id)
     assert actual["area_id"] == office.id
+    assert next(row for row in report["inventory"]["entities"] if row["id"] == child_entity.id)["area_id"] == office.id
+    assert report["inventory"]["floors"] == [{"id": floor.floor_id, "name": floor.name}]
+    assert report["inventory"]["labels"] == [{"id": label.label_id, "name": label.name}]
     body = {"revision": report["revision"], "operations": [{"kind": "entity_area", "subject_id": entity.id, "after": bedroom.id}], "reviews": {}}
     response = await client.post("/api/ai_automation_suggester/organization", json=body)
     assert response.status == 200
@@ -68,9 +77,9 @@ async def test_real_registry_preview_and_stale_revision(hass, hass_client):
     assert (await response.json())["operations"] == body["operations"]
 
 
-async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_user):
+async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_access_token):
     await setup_local(hass)
-    client = await hass_client(hass_read_only_user)
+    client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/organization", json={"approved": True})
