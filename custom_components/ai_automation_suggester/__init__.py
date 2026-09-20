@@ -210,12 +210,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .organization_api import async_deactivate_organization
     try:
         if entry.data.get(CONF_PROVIDER) == LOCAL_PROVIDER:
-            async_deactivate_organization(hass, entry.entry_id)
+            await async_deactivate_organization(hass, entry.entry_id)
             hass.data[DOMAIN].pop(entry.entry_id, None)
             return True
         unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         if unload_ok:
-            async_deactivate_organization(hass, entry.entry_id)
+            await async_deactivate_organization(hass, entry.entry_id)
             hass.data[DOMAIN].pop(entry.entry_id)
         return unload_ok
     except Exception as err:

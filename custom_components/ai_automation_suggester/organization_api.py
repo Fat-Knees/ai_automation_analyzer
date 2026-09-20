@@ -134,6 +134,7 @@ class OrganizationState:
         self.data = None
         self.active_entries = set()
         self.build = None
+        self.observer = None
 
     async def load(self):
         if self.data is None:
@@ -234,12 +235,17 @@ async def async_setup_organization(hass):
     state = OrganizationState(hass)
     await state.load()
     state.build = await hass.async_add_executor_job(read_build)
+    from .observation import ObservationController
+
+    state.observer = ObservationController(hass, state)
+    await state.observer.initialize()
     await hass.http.async_register_static_paths([StaticPathConfig(
         "/ai_automation_suggester/home-intelligence-card.js",
         str(Path(__file__).parent / "www" / "ai_automation_suggester" / "home-intelligence-card.js"), False)])
     hass.http.register_view(OrganizationView())
     hass.http.register_view(OrganizationReadinessView())
     hass.http.register_view(OrganizationLayoutView())
+    hass.http.register_view(OrganizationObservationView())
     hass.data[DOMAIN][STATE_KEY] = state
 
 
@@ -269,7 +275,39 @@ class OrganizationLayoutView(OrganizationView):
                 candidate["preferences"]["layout"] = layout
                 await state.store.async_save(candidate)
                 state.data = candidate
+                if state.observer and not state.observer.error:
+                    exclusions = [identity for identity, policy in layout["entity_policies"].items() if policy["privacy_excluded"]]
+                    await state.hass.async_add_executor_job(state.observer.store.sync_exclusions, exclusions)
                 return self.json(await state.report())
+        except (ValueError, TypeError) as err:
+            return self.json({"error": str(err)}, status_code=400)
+
+
+class OrganizationObservationView(OrganizationView):
+    url = "/api/ai_automation_suggester/observation"
+    name = "api:ai_automation_suggester:observation"
+
+    async def get(self, request):
+        state = self.state(request)
+        return self.json(await state.observer.diagnostics())
+
+    async def post(self, request):
+        state = self.state(request)
+        payload = bytearray()
+        async for chunk in request.content.iter_chunked(1024):
+            payload.extend(chunk)
+            if len(payload) > 2048:
+                raise web.HTTPRequestEntityTooLarge(max_size=2048, actual_size=len(payload))
+        try:
+            body = json.loads(payload)
+            if not isinstance(body, dict) or set(body) != {"enabled"} or type(body["enabled"]) is not bool:
+                raise ValueError("Expected an explicit enabled boolean only")
+            async with state.lock:
+                if body["enabled"]:
+                    await state.observer.start()
+                else:
+                    await state.observer.stop()
+            return self.json(await state.observer.diagnostics())
         except (ValueError, TypeError) as err:
             return self.json({"error": str(err)}, status_code=400)
 
@@ -307,10 +345,12 @@ async def async_activate_organization(hass, entry_id):
     state.active_entries.add(entry_id)
 
 
-def async_deactivate_organization(hass, entry_id):
+async def async_deactivate_organization(hass, entry_id):
     from homeassistant.components.frontend import async_remove_panel
 
     state = hass.data[DOMAIN][STATE_KEY]
     state.active_entries.discard(entry_id)
+    if not state.active_entries and state.observer:
+        await state.observer.stop()
     if not state.active_entries:
         async_remove_panel(hass, PANEL_PATH)

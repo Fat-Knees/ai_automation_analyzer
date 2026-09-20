@@ -634,7 +634,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     privacy.addEventListener("change", () => { policy.privacy_excluded = privacy.checked; this._layout.entity_policies[entity.id] = policy; });
     privacyLabel.prepend(privacy); form.append(privacyLabel);
     panel.append(form);
-    panel.append(this._make("p", "Placement and analysis preferences are saved with Confirm and save layout. Behavioral collection is not active in this build.", "muted"));
+    panel.append(this._make("p", "Placement and analysis preferences are saved with Confirm and save layout. Privacy exclusions apply to the local observer; existing provider requests retain their own filters.", "muted"));
     return panel;
   }
 
@@ -812,6 +812,34 @@ class HomeIntelligenceCard extends HTMLElementBase {
     return section;
   }
 
+  async observationRequest(enabled) {
+    if (this._loading) return;
+    this._loading = true;
+    this._error = null;
+    this.render();
+    try {
+      this._observation = enabled === undefined
+        ? await this._hass.callApi("GET", "ai_automation_suggester/observation")
+        : await this._hass.callApi("POST", "ai_automation_suggester/observation", { enabled });
+    } catch (error) { this._error = errorMessage(error); }
+    finally { this._loading = false; this.render(); }
+  }
+
+  _renderObservation() {
+    const section = this._make("section", undefined, "panel");
+    section.append(this._make("h2", "Local observation"));
+    section.append(this._make("p", "Opt in to store selected numeric and on/off device observations locally. No AI requests or device actions are made. Collection starts paused after each Home Assistant restart or integration reload.", "muted"));
+    section.append(this._button("Refresh observation status", () => this.observationRequest(), { disabled: this._loading }));
+    const data = this._observation;
+    if (!data) return section;
+    section.append(this._make("p", `${data.running ? "Observing" : "Paused"}. ${data.events ?? 0} stored observations; ${data.queue ?? 0} queued; ${data.overflow ?? 0} lost to overflow.`));
+    section.append(this._make("p", `${data.bytes ?? 0} bytes stored; limit ${data.cap_bytes ?? 0} bytes. Event counts are not counts of household actions.`, "muted"));
+    if (data.error) section.append(this._make("p", data.error, "error"));
+    section.append(this._button(data.running ? "Pause observation" : "Start local observation", () => this.observationRequest(!data.running), { disabled: this._loading || Boolean(data.error) }));
+    for (const limitation of data.limitations || []) section.append(this._make("p", limitation, "warning"));
+    return section;
+  }
+
   _renderActions() {
     const section = this._make("section", undefined, "panel");
     section.append(this._make("h2", "Preview controls"));
@@ -851,6 +879,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       content.append(this._renderExplorer());
       content.append(this._renderAreaEditor());
       content.append(this._renderLayout());
+      content.append(this._renderObservation());
       content.append(this._renderProposals());
       content.append(this._renderQuestions());
       content.append(this._renderImpacts());

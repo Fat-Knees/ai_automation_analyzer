@@ -87,3 +87,19 @@ confirmed-layout persistence and unchanged native areas. Linux Chrome checks
 also passed. Next verification adds differential comparisons against HA native
 target expansion for labels, child devices, floors, hidden and diagnostic
 entities. Reference: pinned homeassistant/helpers/target.py at Core 2026.9.3.
+
+## Observation and release work in progress
+
+Live observation is now connected behind explicit Start/Pause controls and starts
+paused on load. It uses stable registry identities, selected numeric/discrete
+states and attributes, immutable per-event location snapshots, a bounded queue,
+atomic SQLite event/checkpoint writes, privacy exclusion and a database size cap.
+Five store tests cover overlap retries, transactional failure, privacy deletion,
+consistent snapshots/schema refusal and same-timestamp pagination. Genuine HA
+observation lifecycle verification is pending the next CI run. This is partial
+M3: no Recorder backfill, aggregate retention, behavior discovery or replay yet.
+
+Release tooling has 18 local archive/fake-remote tests passing. These do not
+substitute for a live release or all T16 scenarios. First-install-only scope and
+manual recovery limitations are documented in RECOVERY.md. No production
+installation, restart or observation has occurred.

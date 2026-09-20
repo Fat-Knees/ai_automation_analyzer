@@ -172,12 +172,46 @@ async def test_target_preview_matches_native_registry_expansion(hass):
         assert predicted == native.referenced | native.indirectly_referenced
 
 
+async def test_local_observation_opt_in_dedup_privacy_and_unload(hass, hass_client):
+    entry = await setup_local(hass)
+    state = hass.data[DOMAIN][STATE_KEY]
+    assert not state.observer.running
+    registry = entity_registry.async_get(hass)
+    entity = registry.async_get_or_create("light", DOMAIN, "observed-light")
+    excluded = registry.async_get_or_create("switch", DOMAIN, "excluded-load")
+    state.data["preferences"]["layout"] = {"entity_policies": {
+        excluded.id: {"privacy_excluded": True, "analysis": "always", "location": "fixed"}}}
+    client = await hass_client()
+    response = await client.post("/api/ai_automation_suggester/observation", json={"enabled": True})
+    assert response.status == 200
+    assert (await response.json())["running"]
+    hass.states.async_set(entity.entity_id, "off")
+    await hass.async_block_till_done()
+    hass.states.async_set(entity.entity_id, "on", {"brightness": 80, "secret": "must not persist"})
+    hass.states.async_set(excluded.entity_id, "on")
+    await hass.async_block_till_done()
+    response = await client.post("/api/ai_automation_suggester/observation", json={"enabled": False})
+    assert response.status == 200
+    assert (await response.json())["running"] is False
+    rows = await hass.async_add_executor_job(state.observer.store.page)
+    assert len(rows) == 2
+    assert {row["kind"] for row in rows} == {"seed", "state"}
+    assert all(row["identity"] == entity.id for row in rows)
+    assert all("secret" not in row["attributes"] for row in rows)
+    await state.observer.start()
+    await hass.config_entries.async_unload(entry.entry_id)
+    assert not state.observer.running
+    assert state.observer.task is None
+
+
 async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_access_token):
     await setup_local(hass)
     client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/layout", json={})
+    assert response.status == 403
+    response = await client.post("/api/ai_automation_suggester/observation", json={"enabled": True})
     assert response.status == 403
     response = await client.get("/api/ai_automation_suggester/readiness")
     assert response.status == 403

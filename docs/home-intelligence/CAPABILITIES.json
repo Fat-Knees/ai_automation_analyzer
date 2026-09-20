@@ -108,21 +108,31 @@
     },
     {
       "requirement": "HI-08",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/observation.py",
+        "custom_components/ai_automation_suggester/history_store.py"
+      ],
+      "unit_tests": [
+        "tests/test_history_store.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished."
     },
     {
       "requirement": "HI-09",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/observation.py",
+        "custom_components/ai_automation_suggester/history_store.py"
+      ],
+      "unit_tests": [
+        "tests/test_history_store.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished."
     },
     {
       "requirement": "HI-10",
@@ -180,12 +190,17 @@
     },
     {
       "requirement": "HI-16",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "tools/hi/build.py",
+        "tools/hi/release.py"
+      ],
+      "unit_tests": [
+        "tests/test_release_tooling.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "First-install tooling and fake-remote tests only. No live deployment; upgrades and automatic authenticated post-start readiness remain incomplete."
     },
     {
       "requirement": "HI-17",

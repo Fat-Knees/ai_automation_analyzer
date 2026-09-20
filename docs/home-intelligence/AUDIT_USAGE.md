@@ -28,8 +28,19 @@ you know they describe the same physical place; the first selected area is the
 proposed canonical one. Saving records your facts and displays missing-space or
 consolidation findings. It never merges/deletes areas. Entity placement and
 analysis preferences are saved with the layout, tied to registry identity.
-Behavior collection is not implemented yet, so these preferences currently
-record intent for that future engine rather than changing upstream providers.
+The optional local observer honors privacy exclusions and Ignore. Other ranking
+preferences record intent for the future routine engine. Existing upstream
+provider requests retain their own filters.
+
+Local observation starts paused. Refresh its status, then explicitly start it to
+collect selected numeric/discrete states and allowlisted attributes. Pause drains
+the bounded queue; unload removes the listener. Reload/restart leaves it paused.
+The owned SQLite store commits events and checkpoints together, deduplicates
+retries and retains each event's observed area mapping. Storage failure stops
+collection while the organization interface remains available. A 512 MiB database
+cap is enforced; retention/aggregation and Recorder backfill are not implemented.
+No routine recommendations are generated from these observations yet. The
+consistent-snapshot helper has local restore tests, not an HA backup restore test.
 
 The admin-only `/api/ai_automation_suggester/readiness` endpoint reports the release
 commit (or development checkout), HA version, active entries and store schema.
