@@ -122,6 +122,28 @@ def test_non_admin_is_rejected_before_state_lookup(api):
     assert error.value.status == 403
 
 
+def test_panel_url_changes_between_releases(api, monkeypatch):
+    panel = types.ModuleType("homeassistant.components.panel_custom")
+    registrations = []
+
+    async def register(hass, **kwargs):
+        registrations.append(kwargs)
+
+    panel.async_register_panel = register
+    monkeypatch.setitem(sys.modules, panel.__name__, panel)
+    state = SimpleNamespace(active_entries=set(), build={"commit": "a" * 40})
+    hass = SimpleNamespace(data={api.DOMAIN: {api.STATE_KEY: state}})
+    asyncio.run(api.async_activate_organization(hass, "first"))
+    asyncio.run(api.async_activate_organization(hass, "second"))
+    assert len(registrations) == 1
+    state.active_entries.clear()
+    state.build = {"commit": "b" * 40}
+    asyncio.run(api.async_activate_organization(hass, "first"))
+    assert registrations[0]["module_url"].endswith("?v=" + "a" * 40)
+    assert registrations[1]["module_url"].endswith("?v=" + "b" * 40)
+    assert all(item["require_admin"] for item in registrations)
+
+
 def test_release_readiness_verifies_payload_and_rejects_tampering(api, monkeypatch, tmp_path):
     module = tmp_path / "organization_api.py"
     module.write_text("# tested source\n", encoding="utf-8")

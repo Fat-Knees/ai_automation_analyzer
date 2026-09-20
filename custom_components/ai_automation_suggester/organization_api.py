@@ -377,10 +377,13 @@ async def async_activate_organization(hass, entry_id):
 
     state = hass.data[DOMAIN][STATE_KEY]
     if not state.active_entries:
+        # A new release needs a new module URL even when the browser retains
+        # a previously imported custom-panel resource.
+        version = (state.build or {}).get("commit") or "development"
         await async_register_panel(hass, frontend_url_path=PANEL_PATH,
                                    webcomponent_name="home-intelligence-card",
                                    sidebar_title="Home Intelligence", sidebar_icon="mdi:home-search",
-                                   module_url="/ai_automation_suggester/home-intelligence-card.js",
+                                   module_url=f"/ai_automation_suggester/home-intelligence-card.js?v={version}",
                                    require_admin=True)
     state.active_entries.add(entry_id)
 
