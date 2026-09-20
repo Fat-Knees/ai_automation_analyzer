@@ -32,8 +32,15 @@ def observation(identity, timestamp, state, attributes, *, kind="state", origin=
         raise ValueError("Invalid observation state or kind")
     if origin not in {"unknown", "user-associated", "parent-context", "integration"}:
         raise ValueError("Unsupported origin evidence")
-    selected = {key: value for key, value in attributes.items()
-                if key in ATTRIBUTES and isinstance(value, (str, int, float, bool)) and len(str(value)) <= 100}
+    selected = {}
+    for key, value in attributes.items():
+        if key not in ATTRIBUTES:
+            continue
+        if key == "unit_of_measurement":
+            if isinstance(value, str) and len(value) <= 16:
+                selected[key] = value
+        elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            selected[key] = value
     value = {"identity": identity, "at": float(timestamp), "state": state, "attributes": selected, "kind": kind}
     # Origin enrichment is not identity: live/Recorder copies must deduplicate.
     value["id"] = hashlib.sha256(canonical(value).encode()).hexdigest()

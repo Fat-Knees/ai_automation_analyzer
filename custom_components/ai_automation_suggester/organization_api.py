@@ -144,6 +144,7 @@ class OrganizationState:
         await self.load()
         inventory, definitions, limitations = collect_inventory(self.hass)
         report = await self.hass.async_add_executor_job(build_audit, inventory, definitions, self.data["preferences"], limitations)
+        report["build"] = self.build
         candidate = copy.deepcopy(self.data)
         latest = {row["id"]: row for row in candidate["mappings"]}
         area_floors = {area["id"]: area.get("floor_id") for area in inventory["areas"]}

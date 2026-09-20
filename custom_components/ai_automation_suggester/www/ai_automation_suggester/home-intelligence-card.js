@@ -224,6 +224,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       mutation_enabled: payload.mutation_enabled === true,
       layout: payload.layout || { description: "", floors: [], areas: [], entity_policies: {} },
       layout_findings: asArray(payload.layout_findings),
+      build: payload.build,
     };
     this._layout = clone(this._data.layout);
     this._draft = clone(this._data.proposed);
@@ -828,6 +829,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
   _renderObservation() {
     const section = this._make("section", undefined, "panel");
     section.append(this._make("h2", "Local observation"));
+    if (this._data.build?.commit) section.append(this._make("p", `Installed build: ${this._data.build.commit}. Files verified: ${this._data.build.files_verified === true ? "yes" : "no"}.`, "entity-id"));
     section.append(this._make("p", "Opt in to store selected numeric and on/off device observations locally. No AI requests or device actions are made. Collection starts paused after each Home Assistant restart or integration reload.", "muted"));
     section.append(this._button("Refresh observation status", () => this.observationRequest(), { disabled: this._loading }));
     const data = this._observation;

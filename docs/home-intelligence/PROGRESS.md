@@ -103,3 +103,10 @@ Release tooling has 18 local archive/fake-remote tests passing. These do not
 substitute for a live release or all T16 scenarios. First-install-only scope and
 manual recovery limitations are documented in RECOVERY.md. No production
 installation, restart or observation has occurred.
+
+Verified runtime commit af940b4: 8 tests passed in 1.03s on HA 2026.9.3 /
+Python 3.14.2; run 35542522113. This includes native target comparison and the
+opt-in observer's collection, selected attributes, privacy filtering and unload.
+Unit suite: 154 tests passed locally, exit 0. Browser desktop/mobile passed.
+Pending small follow-up: finite numeric attribute filtering, HA shutdown draining
+and installed-build display in the authenticated panel.

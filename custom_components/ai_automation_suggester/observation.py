@@ -37,6 +37,10 @@ class ObservationController:
             self.last_snapshot = await self.hass.async_add_executor_job(self.store.diagnostics)
         except Exception as err:
             self.error = f"Observation storage unavailable ({type(err).__name__}); organization remains available."
+        self.hass.bus.async_listen_once("homeassistant_stop", self.shutdown)
+
+    async def shutdown(self, _event):
+        await self.stop()
 
     @property
     def running(self):

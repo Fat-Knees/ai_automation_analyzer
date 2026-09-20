@@ -116,9 +116,13 @@
       "unit_tests": [
         "tests/test_history_store.py"
       ],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished."
+      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Bounded opt-in live observation and storage only; Recorder backfill and full history acceptance remain incomplete."
     },
     {
       "requirement": "HI-09",
@@ -130,9 +134,13 @@
       "unit_tests": [
         "tests/test_history_store.py"
       ],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished."
+      "limitations": "Opt-in live selected observations and owned storage only. Recorder backfill, retention aggregation, complete fault/performance and HA backup restore tests remain unfinished.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Bounded opt-in live observation and storage only; Recorder backfill and full history acceptance remain incomplete."
     },
     {
       "requirement": "HI-10",
@@ -226,11 +234,11 @@
     }
   ],
   "verification": {
-    "code_commit": "5ad93fd2b048ce8449cc7f8403a28d825850a9c7",
+    "code_commit": "af940b4",
     "ha_version": "2026.9.3",
     "python_version": "3.14.2",
-    "runtime_tests_passed": 6,
-    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35541778368",
+    "runtime_tests_passed": 8,
+    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35542522113",
     "scope": "Bounded runtime slice; no full requirement completion or live validation.",
     "browser": "Chrome 153.0.8010.48; synthetic desktop 1280px and mobile 390px audit checks passed"
   }
