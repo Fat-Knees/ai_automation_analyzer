@@ -23,6 +23,8 @@ from .coordinator import AIAutomationCoordinator
 from .error_utils import sanitize_provider_error
 from .store import async_get_suggestion_store
 
+LOCAL_PROVIDER = "Local audit (no AI)"
+
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
@@ -81,6 +83,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the AI Automation Suggester component."""
     hass.data.setdefault(DOMAIN, {})
     async_register_http_views(hass)
+    from .organization_api import async_setup_organization
+
+    await async_setup_organization(hass)
 
     async def handle_generate_suggestions(call: ServiceCall) -> None:
         """Handle the generate_suggestions service call."""
@@ -162,6 +167,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if CONF_PROVIDER not in entry.data:
             raise ConfigEntryNotReady("Provider not specified in config")
 
+        if entry.data[CONF_PROVIDER] == LOCAL_PROVIDER:
+            hass.data[DOMAIN][entry.entry_id] = {"local_audit": True}
+            entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+            return True
+
         coordinator = AIAutomationCoordinator(hass, entry)
         hass.data[DOMAIN][entry.entry_id] = coordinator
 
@@ -195,6 +205,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     try:
+        if entry.data.get(CONF_PROVIDER) == LOCAL_PROVIDER:
+            hass.data[DOMAIN].pop(entry.entry_id, None)
+            return True
         unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
         if unload_ok:
             hass.data[DOMAIN].pop(entry.entry_id)

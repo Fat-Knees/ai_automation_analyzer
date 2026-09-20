@@ -300,6 +300,8 @@ class AIAutomationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input:
             self.provider = user_input[CONF_PROVIDER]
             self.data.update(user_input)
+            if self.provider == "Local audit (no AI)":
+                return self.async_create_entry(title="Home Intelligence — local audit", data=self.data)
             return await {
                 "OpenAI": self.async_step_openai,
                 "Anthropic": self.async_step_anthropic,
@@ -324,6 +326,7 @@ class AIAutomationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_PROVIDER): vol.In(
                         [
+                            "Local audit (no AI)",
                             "Anthropic",
                             "Custom OpenAI",
                             "Generic OpenAI",
@@ -778,6 +781,10 @@ class AIAutomationOptionsFlowHandler(config_entries.OptionsFlow):
         return default
 
     async def async_step_init(self, user_input=None):
+        if self._config_entry.data.get(CONF_PROVIDER) == "Local audit (no AI)":
+            if user_input is not None:
+                return self.async_create_entry(title="", data={})
+            return self.async_show_form(step_id="init", data_schema=vol.Schema({}))
         if user_input:
             new_data = {
                 **self._config_entry.options,

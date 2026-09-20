@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "71ff7d6c72a09eb2dacfb9970456c444b4aba2e4",
+  "requirements": [
+    {
+      "requirement": "HI-01",
+      "status": "partial",
+      "implementation": [],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-02",
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/organization.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-03",
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/organization.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-04",
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/organization.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-05",
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/organization.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-06",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-07",
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/organization.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_organization.py"
+      ],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-08",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-09",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-10",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-11",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-12",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-13",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-14",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-15",
+      "status": "partial",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-16",
+      "status": "not_implemented",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-17",
+      "status": "partial",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    },
+    {
+      "requirement": "HI-18",
+      "status": "partial",
+      "implementation": [],
+      "unit_tests": [],
+      "ha_runtime_tested": false,
+      "live_validated": false,
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+    }
+  ]
+}
