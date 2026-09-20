@@ -9,6 +9,7 @@ from pathlib import Path
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView, StaticPathConfig
 from homeassistant.helpers import area_registry, device_registry, entity_registry, floor_registry, label_registry
+from homeassistant.helpers.http import KEY_HASS
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
@@ -41,7 +42,7 @@ def collect_inventory(hass):
     ar = area_registry.async_get(hass)
     fr = floor_registry.async_get(hass)
     lr = label_registry.async_get(hass)
-    devices = list(dr.devices.values()) + list(dr.child_devices)
+    devices = list(dr.devices) + list(dr.child_devices)
     if any(len(rows) > MAX_INVENTORY for rows in (er.entities, dr.devices, ar.areas, fr.floors, lr.labels)):
         raise ValueError("Inventory exceeds the 5,000-per-registry audit limit; no partial target report was produced")
     if len(devices) > MAX_INVENTORY:
@@ -80,6 +81,7 @@ def collect_inventory(hass):
     for values in inventory.values():
         values.sort(key=lambda row: row["id"])
     definitions, limitations = {}, []
+    definition_budget = [10000]
     for domain in ("automation", "script"):
         component = hass.data.get(domain)
         entities = getattr(component, "entities", None)
@@ -89,7 +91,7 @@ def collect_inventory(hass):
         for entity in entities:
             raw = getattr(entity, "raw_config", None)
             if isinstance(raw, dict):
-                definitions[entity.entity_id] = definition_snapshot(raw, [10000])
+                definitions[entity.entity_id] = definition_snapshot(raw, definition_budget)
             else:
                 limitations.append(f"Definition unavailable: {entity.entity_id}")
     return inventory, definitions, limitations
@@ -146,7 +148,7 @@ class OrganizationView(HomeAssistantView):
         user = request.get("hass_user")
         if user is None or not user.is_admin:
             raise web.HTTPForbidden(reason="Organization audit requires an administrator")
-        hass = request.app["hass"]
+        hass = request.app[KEY_HASS]
         state = hass.data[DOMAIN].get(STATE_KEY)
         if state is None:
             raise web.HTTPServiceUnavailable(reason="Organization audit is not configured")

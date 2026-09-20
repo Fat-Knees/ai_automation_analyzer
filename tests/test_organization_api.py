@@ -95,6 +95,9 @@ def api(monkeypatch):
     helpers = sys.modules["homeassistant.helpers"]
     components = sys.modules["homeassistant.components"]
     monkeypatch.setitem(sys.modules, "homeassistant.components.http", http)
+    helper_http = types.ModuleType("homeassistant.helpers.http")
+    helper_http.KEY_HASS = "hass"
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.http", helper_http)
     monkeypatch.setattr(components, "http", http, raising=False)
     monkeypatch.setattr(helpers, "floor_registry", types.ModuleType("homeassistant.helpers.floor_registry"), raising=False)
     monkeypatch.setattr(helpers, "label_registry", types.ModuleType("homeassistant.helpers.label_registry"), raising=False)
@@ -212,7 +215,7 @@ def test_collect_inventory_returns_registry_allowlist_without_state_attributes(a
         "area": SimpleNamespace(areas={area.id: area}),
         "floor": SimpleNamespace(floors={floor.floor_id: floor}),
         "label": SimpleNamespace(labels={label.label_id: label}),
-        "device": SimpleNamespace(devices={device.id: device}, child_devices=[]),
+        "device": SimpleNamespace(devices=[device], child_devices=[]),
         "entity": SimpleNamespace(entities={entity.entity_id: entity}),
     }
     monkeypatch.setattr(api.area_registry, "async_get", lambda _hass: registries["area"])

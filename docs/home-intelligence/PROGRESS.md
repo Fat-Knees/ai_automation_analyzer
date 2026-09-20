@@ -20,9 +20,22 @@ ambiguous duplicate-name questions, persistent preview reviews and audit-time
 identity observations are implemented. This is partial M1, not the full advanced
 system. `CAPABILITIES.json` tracks all 18 requirement groups.
 
-After initial backend changes: 110 Python tests passed; lint passed. Runtime and
-frontend results will be recorded separately. No production deployment, remote
-HA connection, paid provider request, registry write or device control occurred.
+Latest local verification: 118 Python tests passed (exit 0); lint passed (exit 0).
+The Node frontend test file passed (exit 0), checking request/review behavior and
+safe text rendering using a lightweight harness. This is not a browser-layout test.
+No production deployment, remote HA connection, paid provider request, registry
+write or device control occurred.
+
+Release metadata confirms Core 2026.9.3 needs Python >=3.14.2. The separate Linux
+workflow pins Python 3.14.2, Home Assistant 2026.9.3 and
+pytest-homeassistant-custom-component 0.13.366. The runtime suite is written but
+**not run**: Git push failed because the local Git client is not signed in; the
+connected GitHub app also reports `push: false`. Enabling Actions did not grant
+repository write credentials. User sign-in/push is required to execute that job.
+
+During release-source review, fixed the new and existing HTTP views to use HA's
+typed `KEY_HASS` application key. Also distinguished native child-device area
+inheritance from gateway `via_device` relationships. Both are relevant to 2026.9.3.
 
 ## Known unfinished M1 work
 
