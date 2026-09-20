@@ -48,6 +48,29 @@ def test_device_move_keeps_explicit_channel_override(inventory):
     assert proposed["entities"][1]["area_id"] == "garage"
 
 
+def test_labels_do_not_inherit_from_parent_but_explicit_device_target_does(inventory):
+    inventory["labels"] = [{"id": "routine", "name": "Routine"}]
+    inventory["devices"][0]["labels"] = ["routine"]
+    inventory["devices"].append({"id": "child", "parent_device_id": "relay", "area_id": None})
+    inventory["entities"][0]["device_id"] = "child"
+    selected, unknown = expand_target({"label_id": "routine"}, inventory, "homeassistant.turn_off")
+    assert not unknown
+    assert "switch.desk" not in selected
+    selected, unknown = expand_target({"device_id": "relay"}, inventory, "homeassistant.turn_off")
+    assert "switch.desk" in selected
+
+
+def test_diagnostics_and_hidden_filtering_distinguish_direct_labels(inventory):
+    inventory["labels"] = [{"id": "routine", "name": "Routine"}]
+    entity = inventory["entities"][0]
+    entity.update(entity_category="diagnostic", labels=["routine"])
+    assert "switch.desk" not in expand_target({"area_id": "office"}, inventory, "homeassistant.turn_off")[0]
+    assert "switch.desk" in expand_target({"label_id": "routine"}, inventory, "homeassistant.turn_off")[0]
+    entity["hidden"] = True
+    assert "switch.desk" not in expand_target({"label_id": "routine"}, inventory, "homeassistant.turn_off")[0]
+    assert "switch.desk" in expand_target({"entity_id": "switch.desk"}, inventory, "homeassistant.turn_off")[0]
+
+
 def test_clearing_entity_override_restores_inheritance(inventory):
     proposed = overlay(inventory, [{"kind": "entity_area", "subject_id": "registry-light", "after": None}])
     assert proposed["entities"][1]["area_id"] == "office"

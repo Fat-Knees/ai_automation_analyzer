@@ -267,6 +267,7 @@ def test_collect_inventory_returns_registry_allowlist_without_state_attributes(a
         "explicit_area_id",
         "labels",
         "disabled",
+        "hidden",
         "platform",
         "identity_confidence",
         "device_class",

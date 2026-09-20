@@ -40,14 +40,20 @@
       "status": "partial",
       "implementation": [
         "custom_components/ai_automation_suggester/organization.py",
-        "custom_components/ai_automation_suggester/organization_api.py"
+        "custom_components/ai_automation_suggester/organization_api.py",
+        "custom_components/ai_automation_suggester/layout.py"
       ],
       "unit_tests": [
-        "tests/test_organization.py"
+        "tests/test_organization.py",
+        "tests/test_layout.py"
       ],
-      "ha_runtime_tested": false,
+      "ha_runtime_tested": true,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement.",
+      "runtime_tests": [
+        "runtime_tests/test_home_assistant_runtime.py"
+      ],
+      "runtime_test_scope": "Confirmed-layout persistence, stale revision rejection and registry immutability; topology application remains incomplete."
     },
     {
       "requirement": "HI-04",
@@ -205,11 +211,11 @@
     }
   ],
   "verification": {
-    "code_commit": "0e9a1a87f28266e0d5a2704a3814439a6fbc4c15",
+    "code_commit": "5ad93fd2b048ce8449cc7f8403a28d825850a9c7",
     "ha_version": "2026.9.3",
     "python_version": "3.14.2",
-    "runtime_tests_passed": 4,
-    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35540710375",
+    "runtime_tests_passed": 6,
+    "run_url": "https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35541778368",
     "scope": "Bounded runtime slice; no full requirement completion or live validation.",
     "browser": "Chrome 153.0.8010.48; synthetic desktop 1280px and mobile 390px audit checks passed"
   }

@@ -87,6 +87,7 @@ def collect_inventory(hass):
                   "name": entry.name or entry.original_name or entry.entity_id,
                   "device_id": entry.device_id, "explicit_area_id": entry.area_id,
                   "labels": sorted(entry.labels), "disabled": entry.disabled_by is not None,
+                  "hidden": getattr(entry, "hidden_by", None) is not None,
                   "platform": entry.platform, "identity_confidence": "registry identity",
                   "device_class": entry.device_class or entry.original_device_class or (state.attributes.get("device_class") if state else None),
                   "entity_category": entry.entity_category.value if entry.entity_category else None}

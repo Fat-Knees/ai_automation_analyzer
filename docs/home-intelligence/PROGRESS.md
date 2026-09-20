@@ -20,7 +20,7 @@ ambiguous duplicate-name questions, persistent preview reviews and audit-time
 identity observations are implemented. This is partial M1, not the full advanced
 system. `CAPABILITIES.json` tracks all 18 requirement groups.
 
-Latest local audit verification: 129 Python tests passed (exit 0).
+Latest local audit verification: 131 audit Python tests passed (exit 0).
 The Node frontend test file passed (exit 0), checking request/review behavior and
 safe text rendering using a lightweight harness. Actual Chrome 153.0.8010.48
 browser checks also passed at 1280px and 390px: accept/reject restoration, inherited
@@ -34,13 +34,13 @@ pytest-homeassistant-custom-component 0.13.366. User sign-in resolved the Git pu
 blocker. The first run exposed missing async fixture handling; the runtime command
 now explicitly uses `-o asyncio_mode=auto`.
 
-Verified runtime code commit: `0e9a1a87f28266e0d5a2704a3814439a6fbc4c15`.
-[Linux runtime run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35540710375):
-**4 runtime tests passed**, exit 0, on Python 3.14.2 / HA 2026.9.3. Tests exercise real
+Verified runtime code commit: `5ad93fd2b048ce8449cc7f8403a28d825850a9c7`.
+[Linux runtime run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35541778368):
+**6 runtime tests passed in 0.63s**, exit 0, on Python 3.14.2 / HA 2026.9.3. Tests exercise real
 config-entry setup/reload/unload, registry and child-device inheritance, persisted
 virtual previews without registry mutation, stale revisions, and non-admin denial.
 The frontend job passed in that run. The separate
-[unit/lint run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35540710389)
+[unit/lint run](https://github.com/Fat-Knees/ai_automation_analyzer/actions/runs/35541778307)
 also passed. These bounded tests do not complete every acceptance scenario.
 
 During release-source review, fixed the new and existing HTTP views to use HA's
@@ -56,7 +56,7 @@ inheritance from gateway `via_device` relationships. Both are relevant to 2026.9
 - Continuous identity mapping, deletion/recreation lifecycle and migration tests.
 - Paginated discovery for installations beyond the explicit inventory cap.
 - Full browser accessibility/mobile testing, performance measurements and broader
-  HA lifecycle/security acceptance coverage beyond the four passing runtime tests.
+  HA lifecycle/security acceptance coverage beyond the six passing runtime tests.
 
 ## Remaining milestones
 
@@ -81,3 +81,9 @@ The next CI run will exercise an extracted release archive, its verified file
 hashes, preview persistence, and the actual credential-free user flow.
 Deployment tooling is under review; no release approval is implied by passing
 local audit tests. The requested scope remains all milestones M0 through M6.
+
+The packaged 5ad93fd build passed genuine HA 2026.9.3 tests, including
+confirmed-layout persistence and unchanged native areas. Linux Chrome checks
+also passed. Next verification adds differential comparisons against HA native
+target expansion for labels, child devices, floors, hidden and diagnostic
+entities. Reference: pinned homeassistant/helpers/target.py at Core 2026.9.3.

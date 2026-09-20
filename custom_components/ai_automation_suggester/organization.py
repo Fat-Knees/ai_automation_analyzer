@@ -128,8 +128,8 @@ def _ids(value):
 def expand_target(target, inventory, service):
     """Static membership estimate. Unknown constructs never become empty success.
 
-    Labels, groups, disabled entries and runtime service capability filtering
-    require native runtime verification, so these remain explicit unknowns.
+    Registry expansion follows HA 2026.9.3. Groups, missing composite device
+    IDs and runtime service capability filtering remain explicit unknowns.
     """
     unknown, result = [], set()
     if not isinstance(service, str) or "{{" in service or "." not in service:
@@ -146,22 +146,29 @@ def expand_target(target, inventory, service):
                 unknown.append(f"Dynamic or special target: {key}")
         except ValueError:
             unknown.append(f"Nonliteral target: {key}")
-    if "label_id" in resolved:
-        unknown.append("Label expansion requires native runtime verification")
     areas = {row["id"]: row for row in inventory["areas"]}
     devices = {row["id"]: row for row in inventory["devices"]}
     floors = {row["id"] for row in inventory["floors"]}
     entities = {row["entity_id"]: row for row in inventory["entities"]}
-    for key, known in (("entity_id", entities), ("device_id", devices), ("area_id", areas), ("floor_id", floors)):
+    labels = {row["id"] for row in inventory.get("labels", [])}
+    for key, known in (("entity_id", entities), ("device_id", devices), ("area_id", areas), ("floor_id", floors), ("label_id", labels)):
         if set(resolved.get(key, [])) - set(known):
             unknown.append(f"Missing or unresolved reference: {key}")
     domain = service.split(".")[0]
+    targeted_labels = set(resolved.get("label_id", []))
+    targeted_areas = set(resolved.get("area_id", [])) | {
+        area["id"] for area in areas.values()
+        if area.get("floor_id") in resolved.get("floor_id", []) or targeted_labels.intersection(area.get("labels", []))}
+    explicit_devices = set(resolved.get("device_id", []))
+    targeted_devices = explicit_devices | {
+        device["id"] for device in devices.values()
+        if device.get("parent_device_id") in explicit_devices or targeted_labels.intersection(device.get("labels", []))}
     for entity in inventory["entities"]:
-        area = areas.get(entity["area_id"], {})
-        matched = (entity["entity_id"] in resolved.get("entity_id", [])
-                   or entity.get("device_id") in resolved.get("device_id", [])
-                   or entity["area_id"] in resolved.get("area_id", [])
-                   or area.get("floor_id") in resolved.get("floor_id", []))
+        direct = entity["entity_id"] in resolved.get("entity_id", [])
+        label_match = not entity.get("hidden") and bool(targeted_labels.intersection(entity.get("labels", [])))
+        indirect = (not entity.get("hidden") and not entity.get("entity_category")
+                    and (entity.get("device_id") in targeted_devices or entity["area_id"] in targeted_areas))
+        matched = direct or label_match or indirect
         if not matched:
             continue
         if entity["entity_id"].startswith("group."):

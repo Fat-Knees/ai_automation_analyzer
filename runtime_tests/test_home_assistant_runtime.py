@@ -141,6 +141,37 @@ async def test_confirmed_layout_persists_without_registry_mutation(hass, hass_cl
     assert restored.data["preferences"]["layout"] == layout
 
 
+async def test_target_preview_matches_native_registry_expansion(hass):
+    from homeassistant.const import EntityCategory
+    from homeassistant.helpers.target import TargetSelection, async_extract_referenced_entity_ids
+
+    from custom_components.ai_automation_suggester.organization import expand_target, with_effective_areas
+    from custom_components.ai_automation_suggester.organization_api import collect_inventory
+
+    entry = await setup_local(hass)
+    label = label_registry.async_get(hass).async_create("Target label")
+    floor = floor_registry.async_get(hass).async_create("Target floor")
+    area = area_registry.async_get(hass).async_create("Target area", floor_id=floor.floor_id)
+    devices = device_registry.async_get(hass)
+    parent = devices.async_get_or_create(config_entry_id=entry.entry_id, identifiers={(DOMAIN, "target-parent")})
+    devices.async_update_device(parent.id, area_id=area.id, labels={label.label_id})
+    child = devices.async_get_or_create_child(config_entry_id=entry.entry_id, identifiers={(DOMAIN, "target-child")}, parent_device_id=parent.id)
+    entities = entity_registry.async_get(hass)
+    normal = entities.async_get_or_create("switch", DOMAIN, "target-normal", device_id=parent.id)
+    entities.async_get_or_create("switch", DOMAIN, "target-child", device_id=child.id)
+    diagnostic = entities.async_get_or_create("switch", DOMAIN, "target-diagnostic", device_id=parent.id, entity_category=EntityCategory.DIAGNOSTIC)
+    hidden = entities.async_get_or_create("switch", DOMAIN, "target-hidden", device_id=parent.id)
+    entities.async_update_entity(diagnostic.entity_id, labels={label.label_id})
+    entities.async_update_entity(hidden.entity_id, hidden_by=entity_registry.RegistryEntryHider.USER, labels={label.label_id})
+    inventory = with_effective_areas(collect_inventory(hass)[0])
+    for target in ({"device_id": parent.id}, {"area_id": area.id}, {"floor_id": floor.floor_id},
+                   {"label_id": label.label_id}, {"entity_id": [normal.entity_id, hidden.entity_id, diagnostic.entity_id]}):
+        native = async_extract_referenced_entity_ids(hass, TargetSelection(target), expand_group=False)
+        predicted, unknown = expand_target(target, inventory, "homeassistant.turn_off")
+        assert not unknown
+        assert predicted == native.referenced | native.indirectly_referenced
+
+
 async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_access_token):
     await setup_local(hass)
     client = await hass_client(hass_read_only_access_token)
