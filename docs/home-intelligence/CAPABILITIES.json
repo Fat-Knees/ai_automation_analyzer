@@ -1,5 +1,15 @@
 {
   "schema_version": 1,
+  "live_installation": {
+    "date": "2026-09-20",
+    "commit": "77727c132fef53acb760ee3b0f7248413a6642d4",
+    "ha_version": "2026.9.3",
+    "verified_scope": ["first installation", "local audit configuration", "live inventory rendering", "build file verification", "paused observation diagnostics"],
+    "normal_restarts": 1,
+    "recovery_restarts": 0,
+    "observation_enabled": false,
+    "full_requirements_validated": false
+  },
   "baseline_commit": "71ff7d6c72a09eb2dacfb9970456c444b4aba2e4",
   "requirements": [
     {

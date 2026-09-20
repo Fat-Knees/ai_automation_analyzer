@@ -29,6 +29,17 @@ release = _load_tool("release")
 logs = _load_tool("logs")
 
 
+@pytest.mark.parametrize("strict", ["yes", "true", "no", "false", "ask", "accept-new"])
+def test_ssh_strict_host_key_spellings(monkeypatch, strict):
+    output = f"hostname test-host\nport 2222\nuser root\nstricthostkeychecking {strict}\n"
+    monkeypatch.setattr(release.subprocess, "run", lambda *args, **kwargs: subprocess.CompletedProcess([], 0, output))
+    if strict in {"yes", "true"}:
+        release.SSHRemote(expected_address="test-host")
+    else:
+        with pytest.raises(release.ReleaseError, match="strict host key"):
+            release.SSHRemote(expected_address="test-host")
+
+
 def _git(repo: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
 

@@ -357,7 +357,7 @@ class SSHRemote:
         }
         if options.get("hostname") != self.expected_address or options.get("port") != self.expected_port or options.get("user") != "root":
             raise ReleaseError("SSH alias does not match the configured Home Assistant target")
-        if options.get("stricthostkeychecking", "").lower() != "yes":
+        if options.get("stricthostkeychecking", "").lower() not in {"yes", "true"}:
             raise ReleaseError("SSH alias must enforce strict host key checking")
 
     def _run(self, script: str, *, timeout: int | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:

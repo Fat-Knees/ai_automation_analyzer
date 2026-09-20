@@ -128,3 +128,35 @@ is supported. The diagnostic helper emits only counts and allowlisted exception
 types, never raw household messages. Production installation remains unapproved
 at the time this record was written; the owner has been asked about this exact
 candidate. Full M0-M6 scope remains incomplete as listed above.
+
+## First production installation — 2026-09-20
+
+The owner approved the previously scoped installation in this session. Created
+a fresh encrypted manual backup including HA settings/history and apps; metadata
+confirmed protected=true and Core 2026.9.3. Copied the encrypted archive to the
+ignored local recovery directory and verified matching source/destination SHA-256.
+Private backup identifiers and household addresses are not tracked here.
+
+HACS showed AI Automation Suggester available for download, not installed.
+The first deployment attempt stopped before remote changes because Windows
+OpenSSH reports strict host checking as `true`, while the tool expected `yes`.
+The parser now accepts both equivalent enabled values and rejects no/false/ask/
+accept-new. Release tests: 25 passed; Ruff passed, exit 0.
+
+Deployed the exact candidate 77727c132fef53acb760ee3b0f7248413a6642d4 and
+archive hash recorded above. Deployment returned exit 0, one normal restart,
+no rollback, installed-awaiting-user-setup. Completed the authenticated UI flow
+using Local audit (no AI); Home Assistant reported successful configuration.
+The live Home Intelligence panel loaded actual inventory and explicitly displayed
+the full expected commit with Files verified: yes. Refresh observation status
+reported Paused, zero stored observations, zero queued and zero overflow losses.
+The bounded redacted log summary found no component error lines among 200 lines;
+this is not proof of global HA health. No collection, cloud requests, registry
+changes, automation edits or device controls were initiated.
+
+Live validation is limited to first installation, local configuration, inventory
+rendering, verified build identity and paused observation diagnostics. The separate
+readiness HTTP endpoint, live collection, restore and full M0-M6 behavior have not
+all been live validated. The large household inventory also exposes UI usability
+work: long expanded lists and excessive location questions need prioritization
+and filtering before treating the interface as complete.
