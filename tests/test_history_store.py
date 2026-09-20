@@ -23,6 +23,21 @@ def test_overlap_retry_and_immutable_historical_mapping(store):
     assert store.diagnostics()["checkpoints"] == {"live": 100, "backfill": 101}
 
 
+def test_timeline_is_bounded_keeps_mapping_and_excludes_private_rows(store):
+    events = [observation("registry-a", 100 + i, str(i), {}, kind="state") for i in range(55)]
+    store.append(events, job="live", checkpoint=154, mappings={"registry-a": {"area_id": "former-room"}})
+    page = store.timeline("registry-a")
+    assert len(page["events"]) == 50
+    assert page["coverage"] == []  # Event bounds are not coverage.
+    assert all(event["mapping"]["area_id"] == "former-room" for event in page["events"])
+    older = store.timeline("registry-a", page["next_cursor"])
+    assert len(older["events"]) == 5
+    assert older["next_cursor"] is None
+    assert len({row["id"] for row in page["events"] + older["events"]}) == 55
+    store.exclude("registry-a")
+    assert store.timeline("registry-a")["events"] == []
+
+
 def test_failed_batch_cannot_advance_checkpoint(store):
     valid = observation("registry-a", 100, "on", {})
     invalid = {**valid, "id": "forged"}

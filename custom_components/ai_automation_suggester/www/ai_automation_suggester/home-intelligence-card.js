@@ -874,6 +874,73 @@ class HomeIntelligenceCard extends HTMLElementBase {
     return section;
   }
 
+  async loadTimeline(next = false) {
+    if (!this._timelineIdentity || this._timelineBusy) return;
+    const identity = this._timelineIdentity;
+    const cursor = next ? this._timeline?.next_cursor : null;
+    this._timelineBusy = true;
+    this._timelineError = null;
+    this.render();
+    try {
+      let path = `ai_automation_suggester/timeline?identity=${encodeURIComponent(identity)}`;
+      if (cursor) path += `&before_at=${encodeURIComponent(cursor[0])}&before_id=${encodeURIComponent(cursor[1])}`;
+      const result = await this._hass.callApi("GET", path);
+      if (identity === this._timelineIdentity) this._timeline = result;
+    } catch (error) {
+      this._timelineError = errorMessage(error, "Unable to load activity.");
+    } finally {
+      this._timelineBusy = false;
+      this.render();
+    }
+  }
+
+  _renderActivity() {
+    const section = this._make("section", undefined, "panel");
+    section.append(this._make("h2", "Recorded activity"));
+    section.append(this._make("p", "Choose a reading or control to see what this integration actually recorded. This helps check the evidence before drawing conclusions. Activity is only available after you explicitly start local observation."));
+    const label = this._make("label", "Find a reading or control");
+    const input = document.createElement("input");
+    input.value = this._timelineSearch || "";
+    input.addEventListener("input", () => { this._timelineSearch = input.value; });
+    label.append(input);
+    section.append(label, this._button("Search activity items", () => this.render(), { className: "secondary" }));
+    const matching = this._data.inventory.entities.filter(entity =>
+      `${entityLabel(entity)} ${entity.entity_id}`.toLowerCase().includes((this._timelineSearch || "").toLowerCase()));
+    const choices = matching.slice(0, 100);
+    if (!choices.some(entity => entity.id === this._timelineIdentity)) {
+      this._timelineIdentity = choices[0]?.id;
+      this._timeline = null;
+    }
+    const choiceLabel = this._make("label", "Reading or control");
+    const select = document.createElement("select");
+    for (const entity of choices) {
+      const option = this._make("option", `${entityLabel(entity)} (${entity.entity_id})`);
+      option.value = entity.id;
+      select.append(option);
+    }
+    select.value = this._timelineIdentity || "";
+    select.addEventListener("change", () => {
+      this._timelineIdentity = select.value; this._timeline = null; this.render();
+    });
+    choiceLabel.append(select); section.append(choiceLabel);
+    if (matching.length > 100) section.append(this._make("p", "Showing the first 100 matches. Search by name to narrow the list.", "muted"));
+    section.append(this._button(this._timelineBusy ? "Loading activity…" : "Show recent activity", () => this.loadTimeline(), { disabled: this._timelineBusy || !choices.length }));
+    if (this._timelineError) section.append(this._renderNotice(this._timelineError, "notice error"));
+    if (!this._timeline) return section;
+    if (!this._timeline.events?.length) section.append(this._empty("No observations stored for this item. This does not mean it was inactive. Observation may be paused, or this type of data may not be collected."));
+    for (const event of this._timeline.events || []) {
+      const row = this._make("div", undefined, "notice");
+      row.append(this._make("p", `${new Date(event.at * 1000).toLocaleString()} — ${event.state}`));
+      const kind = { seed: "Initial state, not a new action", restored: "Restored state, not a new action", attribute: "Selected attributes changed", removed: "Entity became absent", state: "State changed" }[event.kind] || "Unknown event type";
+      row.append(this._make("p", `${kind}. Origin: ${event.origin}.`, "muted"));
+      if (Object.keys(event.attributes || {}).length) row.append(this._make("p", Object.entries(event.attributes).map(([key, value]) => `${key}: ${value}`).join(" · ")));
+      section.append(row);
+    }
+    if (this._timeline.next_cursor) section.append(this._button("Older activity", () => this.loadTimeline(true), { disabled: this._timelineBusy }));
+    for (const limitation of this._timeline.limitations || []) section.append(this._make("p", limitation, "muted"));
+    return section;
+  }
+
   _navigate(view) {
     this._view = view;
     this.render();
@@ -954,7 +1021,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       if (this._error) content.append(this._renderNotice("The data shown below may be stale. Refresh before reviewing or saving.", "notice warning"));
       const nav = this._make("nav", undefined, "navigation");
       nav.setAttribute("aria-label", "Home Intelligence sections");
-      for (const [view, label] of [["start", "Start here"], ["rooms", "Rooms"], ["observation", "Observation"], ["advanced", "Advanced review"]]) {
+      for (const [view, label] of [["start", "Start here"], ["rooms", "Rooms"], ["activity", "Recorded activity"], ["observation", "Observation"], ["advanced", "Advanced review"]]) {
         const button = this._button(label, () => this._navigate(view), { className: "secondary" });
         button.setAttribute("aria-pressed", String(this._view === view));
         nav.append(button);
@@ -962,6 +1029,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
       content.append(nav);
       if (this._view === "start") content.append(this._renderStart());
       if (this._view === "rooms") content.append(this._renderRooms());
+      if (this._view === "activity") content.append(this._renderActivity());
       if (this._view === "observation") {
         content.append(this._renderNotice("This is optional. Observation records selected device changes locally; it does not yet generate automation recommendations. You can leave it paused while reviewing your rooms."));
         content.append(this._renderObservation());

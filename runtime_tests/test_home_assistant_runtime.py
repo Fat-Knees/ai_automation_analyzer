@@ -209,6 +209,8 @@ async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_a
     client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
     assert response.status == 403
+    response = await client.get("/api/ai_automation_suggester/timeline?identity=anything")
+    assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/layout", json={})
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/observation", json={"enabled": True})
@@ -217,3 +219,27 @@ async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_a
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/organization", json={"approved": True})
     assert response.status == 403
+
+
+async def test_timeline_reads_owned_evidence_and_rejects_malformed_queries(hass, hass_client):
+    from custom_components.ai_automation_suggester.history_store import observation
+
+    await setup_local(hass)
+    state = hass.data[DOMAIN][STATE_KEY]
+    event = observation("timeline-identity", 100, "on", {"brightness": 42, "secret": "not allowed"})
+
+    def write():
+        state.observer.store.append([event], job="test", checkpoint=100,
+                                    mappings={"timeline-identity": {"area_id": "old-room"}})
+
+    await hass.async_add_executor_job(write)
+    client = await hass_client()
+    response = await client.get("/api/ai_automation_suggester/timeline?identity=timeline-identity")
+    assert response.status == 200
+    data = await response.json()
+    assert data["events"][0]["mapping"]["area_id"] == "old-room"
+    assert data["events"][0]["attributes"] == {"brightness": 42}
+    assert data["coverage"] == []
+    for query in ("identity=timeline-identity&before_at=nan&before_id=bad", "identity=timeline-identity&limit=100000", ""):
+        assert (await client.get("/api/ai_automation_suggester/timeline?" + query)).status == 400
+    assert (await client.post("/api/ai_automation_suggester/timeline", json={})).status == 405

@@ -148,6 +148,20 @@ class HistoryStore:
                     "coverage": [dict(row) for row in connection.execute("SELECT * FROM coverage ORDER BY end DESC LIMIT 500")],
                     "coverage_note": "Returned event bounds do not establish continuous history coverage."}
 
+    def timeline(self, identity, before=None):
+        """A bounded entity timeline; no current location is applied to old rows."""
+        rows = self.page(identity=identity, before=before, limit=51)
+        more = len(rows) > 50
+        rows = rows[:50]
+        with self.connect() as connection:
+            coverage = [dict(row) for row in connection.execute(
+                "SELECT start, end, status, reason FROM coverage WHERE identity=? ORDER BY end DESC LIMIT 50", (identity,))]
+        return {"events": rows, "coverage": coverage,
+                "next_cursor": [rows[-1]["at"], rows[-1]["id"]] if more else None,
+                "limitations": ["Only locally collected selected states and attributes are shown.",
+                                "No earlier Recorder history is imported yet. Missing observations do not mean a device was off.",
+                                "Seed and restored states do not establish a household action. Control origin can be unknown."]}
+
     def exclude(self, identity):
         """Privacy removal and future ingestion refusal commit together."""
         with self.connect() as connection:

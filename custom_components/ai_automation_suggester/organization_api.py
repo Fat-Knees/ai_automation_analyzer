@@ -5,6 +5,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import math
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -247,6 +248,7 @@ async def async_setup_organization(hass):
     hass.http.register_view(OrganizationReadinessView())
     hass.http.register_view(OrganizationLayoutView())
     hass.http.register_view(OrganizationObservationView())
+    hass.http.register_view(OrganizationTimelineView())
     hass.data[DOMAIN][STATE_KEY] = state
 
 
@@ -311,6 +313,43 @@ class OrganizationObservationView(OrganizationView):
             return self.json(await state.observer.diagnostics())
         except (ValueError, TypeError) as err:
             return self.json({"error": str(err)}, status_code=400)
+
+
+class OrganizationTimelineView(OrganizationView):
+    """Admin-only, one-identity pages from the owned store, never Recorder."""
+
+    url = "/api/ai_automation_suggester/timeline"
+    name = "api:ai_automation_suggester:timeline"
+
+    async def get(self, request):
+        state = self.state(request)
+        try:
+            if set(request.query) - {"identity", "before_at", "before_id"}:
+                raise ValueError("Unsupported timeline parameters")
+            identity = request.query.get("identity", "")
+            if not identity or len(identity) > 255:
+                raise ValueError("Select a registered entity")
+            before = None
+            if "before_at" in request.query or "before_id" in request.query:
+                at = float(request.query.get("before_at", "nan"))
+                event_id = request.query.get("before_id", "")
+                if not math.isfinite(at) or not re.fullmatch(r"[0-9a-f]{64}", event_id):
+                    raise ValueError("Invalid timeline cursor")
+                before = (at, event_id)
+            async with state.lock:
+                if not state.observer or state.observer.error:
+                    return self.json({"error": "Local observation storage is unavailable."}, status_code=503)
+                policies = state.data["preferences"].get("layout", {}).get("entity_policies", {})
+                if policies.get(identity, {}).get("privacy_excluded"):
+                    return self.json({"error": "This entity is excluded from local history."}, status_code=403)
+                result = await state.hass.async_add_executor_job(state.observer.store.timeline, identity, before)
+                return self.json(result)
+        except (ValueError, TypeError) as err:
+            return self.json({"error": str(err)}, status_code=400)
+
+    async def post(self, request):
+        self.state(request)
+        raise web.HTTPMethodNotAllowed("POST", ["GET"])
 
 
 class OrganizationReadinessView(OrganizationView):

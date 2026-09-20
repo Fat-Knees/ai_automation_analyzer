@@ -131,6 +131,10 @@ async function loadCard(page, baseUrl) {
     card.hass = {
       async callApi(method, endpoint, body) {
         window.__calls.push({ method, endpoint, body: body === undefined ? undefined : JSON.parse(JSON.stringify(body)) });
+        if (method === "GET" && endpoint.startsWith("ai_automation_suggester/timeline?")) return {
+          events: [{ at: 100, state: "on", kind: "seed", origin: "unknown", attributes: { brightness: 42 } }],
+          coverage: [], next_cursor: null, limitations: ["Synthetic selected observations only"],
+        };
         if (method === "POST" && endpoint.endsWith("/layout")) return { ...data.__saved, layout: body.layout, revision: "rev-3" };
         if (method === "POST") return { saved: true };
         const response = responses[Math.min(getCount++, responses.length - 1)];
@@ -242,6 +246,10 @@ async function runScenario(page, baseUrl, viewportLabel) {
   assert.deepEqual(imported.areas.map(area => area.registry_area_ids), [["area-office"], ["area-garage"]]);
   assert.ok(imported.areas.every(area => area.floor_key === imported.floors[0].key && !area.outdoor));
   assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.method === "POST").length, 0, "import only prepares a draft");
+  await page.getByRole("button", { name: "Recorded activity", exact: true }).click();
+  await page.getByRole("button", { name: "Show recent activity", exact: true }).click();
+  await page.getByText("Initial state, not a new action. Origin: unknown.", { exact: true }).waitFor();
+  assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.method === "POST").length, 0, "timeline cannot start observation or actuate devices");
   return { viewportLabel, callCount: calls.length, geometry };
 }
 

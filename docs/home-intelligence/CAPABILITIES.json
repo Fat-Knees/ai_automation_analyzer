@@ -218,7 +218,7 @@
       ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "First-install tooling and fake-remote tests only. No live deployment; upgrades and automatic authenticated post-start readiness remain incomplete."
+      "limitations": "First installation was live verified for build 77727c1. Frontend-only update tooling has fake-remote fault tests; general backend/schema upgrades and automatic authenticated post-start readiness remain incomplete."
     },
     {
       "requirement": "HI-17",

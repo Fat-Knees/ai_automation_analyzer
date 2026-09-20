@@ -183,3 +183,19 @@ restores verified code on pre-restart failures. Seven fake-remote/change-scope
 tests cover success, configuration failure, lost install/preserve/restart replies,
 changed prior files and backend-change refusal. Post-restart recovery remains a
 separate inspected operation; no uncertain restart is repeated automatically.
+
+Guided interface candidate 07d394563ccba199f08a124d6ffd08c3c818e0cf passed Linux
+runtime/browser run 35544631724 and unit run 35544631708. Its archive SHA-256 is
+1e5c11c350163e146fe5ba2f0f559b9cca1460d2d8c4ec777290336d4e0b1c23.
+
+## Activity evidence view (development, separate from UI-only candidate)
+
+Added an admin-only owned-history timeline endpoint and searchable Recorded
+activity page. Pages contain at most 50 observations with a keyset cursor, selected
+attributes, original per-event mappings and explicit limitations. Initial/restored
+states are labeled separately from changes; missing data is not called inactivity.
+Browsing activity cannot start observation or invoke device services. The store
+test checks bounded pagination, non-fabricated coverage and exclusion deletion.
+Chrome desktop/mobile timeline checks pass; 171 local tests plus lint and Node
+pass. A real HA timeline endpoint/admin test is added for the next Linux CI run.
+This does not complete Recorder backfill, behavioral detection or recommendations.
