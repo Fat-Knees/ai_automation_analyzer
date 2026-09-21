@@ -320,3 +320,8 @@ be replayed, every attempt counts against the existing call caps, and errors nev
 automatically retry. Native structured-output schema serialization and failure/retry
 behavior are covered by new runtime tests. Local 187 tests, Ruff, Node and desktop/
 mobile browser smoke passed; new Linux runtime results remain pending.
+
+Repair CI 35548699346: 11 runtime tests passed and one test failed because its
+new assertion imported the obsolete voluptuous_openapi serializer. HA 2026.9.3
+uses probatio.to_openapi; corrected that test to the installed-version serializer.
+This CI failure is separate from the still-unidentified live request failure.

@@ -284,9 +284,9 @@ async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client,
 
         inspect.signature(native_generate).bind(hass, **kwargs)
         assert kwargs["structure"]({"ideas": []}) == {"ideas": []}
-        from voluptuous_openapi import convert
+        from probatio import to_openapi
 
-        assert convert(kwargs["structure"])["properties"]["ideas"]["type"] == "array"
+        assert to_openapi(kwargs["structure"])["properties"]["ideas"]["type"] == "array"
         return SimpleNamespace(data={"ideas": [{"title": "Synthetic idea", "description": "Consider a light schedule.",
                                                "entity_ids": [light.entity_id], "kind": "capability_idea", "evidence_ids": []}]})
 
