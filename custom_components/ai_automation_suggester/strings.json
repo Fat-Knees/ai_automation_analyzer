@@ -3,9 +3,9 @@
   "config": {
     "step": {
       "user": {
-        "title": "Select local audit or AI provider",
+        "title": "Select AI Provider",
         "data": {
-          "provider": "Mode or AI provider"
+          "provider": "AI Provider"
         }
       },
       "openai": {

@@ -1,7 +1,0 @@
-Resume the Home Intelligence project. Read applicable AGENTS.md, SPEC.md, ACCEPTANCE_TESTS.md, PROGRESS.md, CAPABILITIES.json, and the latest Git changes before deciding what remains.
-
-Verify the last claimed milestone against actual code and test results. Do not assume a previous agent completed work merely because its summary says so. Preserve the complete advanced scope and requirement IDs. Re-run affected tests, address blockers or regressions, and continue with the next end-to-end slice that can be implemented safely.
-
-Existing approval boundaries still apply. A previous deployment approval does not automatically authorize a new build, another restart, a new mutation plan, or paid calls. Complete independent local work while waiting for a genuinely required approval. Keep one production deployment owner.
-
-Finish with an accurate handoff: requirement IDs implemented, files changed, tests and exit codes, measured metrics, HA versions tested, unresolved risks, and the next concrete task. Update PROGRESS.md and CAPABILITIES.json. Do not replace unfinished functionality with a claim that the project is complete.

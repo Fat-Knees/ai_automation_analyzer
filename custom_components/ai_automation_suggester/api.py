@@ -5,7 +5,6 @@ from __future__ import annotations
 from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.http import KEY_HASS
 
 from .store import async_get_suggestion_store
 
@@ -18,7 +17,7 @@ class AISuggestionsView(HomeAssistantView):
     requires_auth = True
 
     async def get(self, request: web.Request) -> web.Response:
-        hass: HomeAssistant = request.app[KEY_HASS]
+        hass: HomeAssistant = request.app["hass"]
         store = async_get_suggestion_store(hass)
         return self.json(await store.async_list())
 
@@ -39,7 +38,7 @@ class AISuggestionActionView(HomeAssistantView):
         if action not in status_map:
             return self.json({"success": False, "error": "Unsupported action"}, status_code=400)
 
-        hass: HomeAssistant = request.app[KEY_HASS]
+        hass: HomeAssistant = request.app["hass"]
         store = async_get_suggestion_store(hass)
         suggestion = await store.async_update_status(suggestion_id, status_map[action])
         if suggestion is None:
