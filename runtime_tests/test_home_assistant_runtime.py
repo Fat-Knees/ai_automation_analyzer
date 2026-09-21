@@ -280,9 +280,17 @@ async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client,
     async def generate(hass, **kwargs):
         calls.append(kwargs)
         assert kwargs["llm_api"] is None and kwargs["attachments"] is None
+        import inspect
+
+        inspect.signature(native_generate).bind(hass, **kwargs)
+        assert kwargs["structure"]({"ideas": []}) == {"ideas": []}
+        from voluptuous_openapi import convert
+
+        assert convert(kwargs["structure"])["properties"]["ideas"]["type"] == "array"
         return SimpleNamespace(data={"ideas": [{"title": "Synthetic idea", "description": "Consider a light schedule.",
                                                "entity_ids": [light.entity_id], "kind": "capability_idea", "evidence_ids": []}]})
 
+    native_generate = ai_task.async_generate_data
     monkeypatch.setattr(ai_task, "async_generate_data", generate)
     client = await hass_client()
     endpoint = "/api/ai_automation_suggester/recommendation_ai"
@@ -294,6 +302,7 @@ async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client,
     assert not calls
     body = {"action": "generate", "task": task.entity_id, "digest": preview["digest"], "approve_cloud_request": False}
     assert (await client.post(endpoint, json=body)).status == 409
+
     assert not calls
     body["approve_cloud_request"] = True
     response = await client.post(endpoint, json=body)
@@ -304,3 +313,37 @@ async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client,
     assert len(calls) == 1
     registry.async_update_entity(light.entity_id, name="Changed since preview")
     assert (await client.post(endpoint, json=body)).status == 409
+
+
+async def test_native_ai_failure_diagnostics_persist_without_retry(hass, hass_client, monkeypatch):
+    from homeassistant.components import ai_task
+
+    await setup_local(hass)
+    registry = entity_registry.async_get(hass)
+    task = registry.async_get_or_create("ai_task", "openai_conversation", "synthetic-failed-task")
+    hass.states.async_set(task.entity_id, "unknown", {"supported_features": 1})
+    calls = []
+
+    async def generate(*args, **kwargs):
+        calls.append(True)
+        raise RuntimeError("secret-provider-message")
+
+    monkeypatch.setattr(ai_task, "async_generate_data", generate)
+    client = await hass_client()
+    endpoint = "/api/ai_automation_suggester/recommendation_ai"
+    preview = await (await client.post(endpoint, json={"action": "preview", "task": task.entity_id})).json()
+    body = {"action": "generate", "task": task.entity_id, "digest": preview["digest"], "approve_cloud_request": True}
+    response = await client.post(endpoint, json=body)
+    assert response.status == 502
+    assert "secret-provider-message" not in await response.text()
+    status = await (await client.get(endpoint)).json()
+    assert status["last_failure"]["code"] == "provider_error"
+    assert (await client.post(endpoint, json=body)).status == 409
+    assert len(calls) == 1
+    retry_preview = await (await client.post(endpoint, json={"action": "preview", "task": task.entity_id})).json()
+    assert retry_preview["retry_of"]
+    retry = {**body, "retry_of": retry_preview["retry_of"]}
+    assert (await client.post(endpoint, json=retry)).status == 502
+    assert len(calls) == 2
+    assert (await client.post(endpoint, json=retry)).status == 409
+    assert len(calls) == 2

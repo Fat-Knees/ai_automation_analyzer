@@ -335,11 +335,14 @@ class OrganizationAIView(OrganizationView):
             allowed = {row["entity_id"] for row in preview["payload"]["entities"]}
             history = [{**row, "ideas": [idea for idea in row.get("ideas", []) if set(idea["entity_ids"]).issubset(allowed)]}
                        for row in journal if row.get("status") == "completed"]
+            last_failure = next((row.get("failure", {"code": "unknown", "message": "A previous AI request failed. This older build did not retain its failure details; it will not be automatically retried."})
+                                 for row in reversed(journal) if row.get("status") == "failed_or_unknown"), None)
             return self.json({"tasks": ai_tasks(state.hass), "history": history[-10:], "running": state.ai_request_lock.locked(),
+                              "last_failure": last_failure,
                               "limits": "At most 3 requests per UTC day and 30 per month. No automatic retries. This is a call limit, not a dollar guarantee; provider billing and output limits apply."})
 
     async def post(self, request):
-        from .recommendation_ai import validate_response
+        from .recommendation_ai import failure_details, response_structure, validate_response
 
         state = self.state(request)
         raw = bytearray()
@@ -352,6 +355,10 @@ class OrganizationAIView(OrganizationView):
             if not isinstance(body, dict) or body.get("action") not in {"preview", "generate"}:
                 raise ValueError("Choose preview or generate")
             expected = {"action", "task"} if body["action"] == "preview" else {"action", "task", "digest", "approve_cloud_request"}
+            if body["action"] == "generate" and "retry_of" in body:
+                expected.add("retry_of")
+                if not isinstance(body["retry_of"], str):
+                    raise ValueError("Unsupported retry approval")
             if set(body) != expected or not isinstance(body["task"], str):
                 raise ValueError("Unsupported AI request fields")
             tasks = ai_tasks(state.hass)
@@ -361,7 +368,11 @@ class OrganizationAIView(OrganizationView):
                 preview = ai_context(state)
             bound_digest = hashlib.sha256((body["task"] + preview["digest"]).encode()).hexdigest()
             if body["action"] == "preview":
+                async with state.lock:
+                    prior = next((row for row in reversed(state.data.get("ai_recommendation_journal", [])) if row["digest"] == bound_digest), None)
+                retry_of = hashlib.sha256(json.dumps(prior, sort_keys=True).encode()).hexdigest() if prior and prior.get("status") == "failed_or_unknown" else None
                 return self.json({"task": body["task"], "provider": "OpenAI", **preview,
+                                  "retry_of": retry_of,
                                   "digest": bound_digest,
                                   "notice": "Sends only the displayed selected entity names, IDs, device classes, area names and any displayed summarized behavioral evidence to OpenAI. No raw history, credentials, images or device-control tools. API charges may apply. Ideas without behavioral evidence are labeled capability ideas."})
             if body["approve_cloud_request"] is not True or body["digest"] != bound_digest:
@@ -381,16 +392,22 @@ class OrganizationAIView(OrganizationView):
                 if prior:
                     if prior["status"] == "completed":
                         return self.json({"ideas": prior["ideas"], "cached": True})
-                    return self.json({"error": "This request was already attempted. Its result may be unknown; it will not be automatically repeated."}, status_code=409)
+                    retry_token = hashlib.sha256(json.dumps(prior, sort_keys=True).encode()).hexdigest()
+                    if prior["status"] != "failed_or_unknown" or body.get("retry_of") != retry_token:
+                        return self.json({"error": "This request was already attempted. Preview it again and explicitly approve a new potentially billable attempt; pending requests cannot be retried."}, status_code=409)
+                elif "retry_of" in body:
+                    return self.json({"error": "Retry approval is no longer current"}, status_code=409)
                 month = now.strftime("%Y-%m")
                 day = now.strftime("%Y-%m-%d")
                 monthly = [row for row in journal if row["date"].startswith(month)]
                 if len(monthly) >= 30 or sum(row["date"] == day for row in monthly) >= 3:
                     return self.json({"error": "AI request allowance reached"}, status_code=429)
                 updated = copy.deepcopy(state.data)
-                updated["ai_recommendation_journal"] = monthly + [{"digest": bound_digest, "task": body["task"], "date": day, "status": "pending"}]
+                attempt = hashlib.sha256((bound_digest + now.isoformat()).encode()).hexdigest()
+                updated["ai_recommendation_journal"] = monthly + [{"digest": bound_digest, "attempt": attempt, "task": body["task"], "date": day, "status": "pending"}]
                 await state.store.async_save(updated)
                 state.data = updated
+            failure_stage = "provider"
             try:
                 from homeassistant.components.ai_task import async_generate_data
                 from homeassistant.core import Context
@@ -398,20 +415,24 @@ class OrganizationAIView(OrganizationView):
                 async with asyncio.timeout(90):
                     response = await async_generate_data(state.hass, task_name="Home Intelligence recommendations",
                                                          entity_id=body["task"], instructions=preview["instructions"],
+                                                         structure=response_structure(),
                                                          attachments=None, llm_api=None,
                                                          context=Context(user_id=request["hass_user"].id))
+                failure_stage = "validation"
                 ideas = validate_response(response.data, preview)
             except Exception as err:
+                failure = failure_details(err, failure_stage)
                 async with state.lock:
                     updated = copy.deepcopy(state.data)
-                    record = next(row for row in updated["ai_recommendation_journal"] if row["digest"] == bound_digest)
+                    record = next(row for row in updated["ai_recommendation_journal"] if row.get("attempt") == attempt)
                     record["status"] = "failed_or_unknown"
+                    record["failure"] = failure
                     await state.store.async_save(updated)
                     state.data = updated
-                return self.json({"error": f"AI request did not produce a validated result ({type(err).__name__}). No automation was installed."}, status_code=502)
+                return self.json({"error": failure["message"]}, status_code=502)
             async with state.lock:
                 updated = copy.deepcopy(state.data)
-                record = next(row for row in updated["ai_recommendation_journal"] if row["digest"] == bound_digest)
+                record = next(row for row in updated["ai_recommendation_journal"] if row.get("attempt") == attempt)
                 record.update(status="completed", ideas=ideas)
                 await state.store.async_save(updated)
                 state.data = updated

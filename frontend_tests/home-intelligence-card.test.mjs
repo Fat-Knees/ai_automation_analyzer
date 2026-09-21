@@ -96,6 +96,8 @@ assert.equal(card._operations[0].after, null, "saved operations should initializ
 assert.deepEqual(JSON.parse(JSON.stringify(card._reviews)), { "proposal-1": "accepted" }, "saved proposal statuses must be carried into a future POST");
 
 assert.equal(errorMessage({ message: "bad request" }), "bad request");
+assert.equal(errorMessage({ body: { error: "Provider response was invalid" }, message: "HTTP 502" }), "Provider response was invalid");
+assert.equal(errorMessage({ body: { error: { unsafe: true } } }), "Unable to load the organization preview.");
 assert.equal(errorMessage({}), "Unable to load the organization preview.");
 
 console.log("home-intelligence-card tests passed");

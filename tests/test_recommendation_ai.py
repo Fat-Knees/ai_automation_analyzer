@@ -40,3 +40,15 @@ def test_rejects_code_fences_and_oversized_results():
     for value in ('```json\n{"ideas": []}\n```', " " * 32001, {"ideas": [idea()] * 6}):
         with pytest.raises(ValueError):
             validate_response(value, context())
+
+
+def test_failure_details_never_expose_provider_text():
+    from custom_components.ai_automation_suggester.recommendation_ai import failure_details
+
+    for error, stage, code in [(ValueError("secret-provider-body"), "validation", "invalid_response"),
+                               (TimeoutError("secret-provider-body"), "provider", "timeout"),
+                               (RuntimeError("secret-provider-body"), "provider", "provider_error")]:
+        result = failure_details(error, stage)
+        assert result["code"] == code
+        assert "secret-provider-body" not in str(result)
+        assert "not be automatically retried" in result["message"]

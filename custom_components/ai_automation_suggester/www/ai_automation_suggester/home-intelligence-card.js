@@ -138,6 +138,7 @@ export function createPreviewPayload(revision, operations, reviews) {
 
 export function errorMessage(error, fallback = "Unable to load the organization preview.") {
   if (typeof error === "string" && error) return error;
+  if (error && typeof error.body?.error === "string" && error.body.error) return error.body.error;
   if (error && typeof error.message === "string" && error.message) return error.message;
   return fallback;
 }
@@ -844,10 +845,13 @@ class HomeIntelligenceCard extends HTMLElementBase {
         this._aiStatus = await this._hass.callApi("GET", path);
         this._aiTask ||= this._aiStatus.tasks?.[0]?.entity_id;
         this._aiIdeas = asArray(this._aiStatus.history).flatMap(item => asArray(item.ideas));
+        this._aiError = this._aiStatus.last_failure?.message || null;
       } else if (action === "preview") {
         this._aiPreview = await this._hass.callApi("POST", path, { action, task: this._aiTask });
       } else if (action === "generate" && this._aiPreview) {
-        const result = await this._hass.callApi("POST", path, { action, task: this._aiPreview.task, digest: this._aiPreview.digest, approve_cloud_request: true });
+        const approval = { action, task: this._aiPreview.task, digest: this._aiPreview.digest, approve_cloud_request: true };
+        if (this._aiPreview.retry_of) approval.retry_of = this._aiPreview.retry_of;
+        const result = await this._hass.callApi("POST", path, approval);
         this._aiIdeas = result.ideas;
         this._aiPreview = null;
       }
@@ -881,7 +885,8 @@ class HomeIntelligenceCard extends HTMLElementBase {
       section.append(this._make("p", this._aiPreview.notice, "warning"));
       section.append(this._make("p", `${this._aiPreview.payload.entities.length} selected entities; ${this._aiPreview.bytes} bytes of instructions and facts. ${this._aiPreview.payload.inventory_truncated ? "Inventory is limited; not all devices are included." : ""}`));
       section.append(this._disclosure("Exact information and instructions to be sent", this._make("pre", this._aiPreview.instructions)));
-      section.append(this._button("Send this preview to OpenAI and generate ideas", () => this.recommendationAI("generate"), { disabled: this._aiBusy }));
+      if (this._aiPreview.retry_of) section.append(this._make("p", "The earlier attempt failed and may have been charged. This button explicitly authorizes one new request; it may incur another charge.", "warning"));
+      section.append(this._button(this._aiPreview.retry_of ? "Approve one new OpenAI attempt (may charge again)" : "Send this preview to OpenAI and generate ideas", () => this.recommendationAI("generate"), { disabled: this._aiBusy }));
     }
     for (const idea of asArray(this._aiIdeas)) {
       const card = this._make("article", undefined, "notice");

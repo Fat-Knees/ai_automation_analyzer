@@ -289,3 +289,34 @@ completed and its local copy matched the remote SHA-256. Requested approval to
 replace the still-pending cache-only build with this build, one restart total,
 and optionally one bounded OpenAI AI Task request for selected metadata.
 No new production build, restart or paid request has occurred yet.
+
+
+## Approved recommendation deployment and failed live request
+
+Installed f90058dbe9f38e9e57c87d60e12a8b5d68142caa after exact-build approval.
+Fresh encrypted backup 186ef812 was copied and SHA-256 verified before installation.
+Staging, file verification, preservation of prior code and core check completed.
+The single restart command timed out at 90 seconds (runner exit 1); no second
+restart was issued. Subsequent UI verified the installed build and all files,
+and observation remained paused (1118 prior stored observations, no overflow).
+The new Recommendations page discovered the existing OpenAI AI Task and displayed
+an 80-entity, 11653-byte metadata-only preview with empty behavioral evidence.
+One generation button submission by this agent returned a failure. No validated
+ideas were displayed or installed. Billing outcome is unknown; no retry was made.
+The UI discarded Home Assistant's structured error body, while the backend kept
+only failed_or_unknown, so the original reason cannot be recovered from that journal.
+Redacted scans of 200 then 2000 core log lines yielded no OpenAI-specific diagnostic.
+The native provider uses recommended settings; these were inspected without saving.
+
+Follow-up local changes preserve fixed failure categories without provider text,
+surface HA error bodies, retain failures in read-only status, and request native
+structured JSON output while retaining strict entity/evidence validation. This is
+not a confirmed root-cause fix. Failed/pending requests still cannot retry implicitly.
+These changes are not deployed. All larger unfinished requirements remain open.
+
+The follow-up also adds explicit one-attempt retry approval bound to the latest
+failed journal record. Pending requests remain blocked; old retry approvals cannot
+be replayed, every attempt counts against the existing call caps, and errors never
+automatically retry. Native structured-output schema serialization and failure/retry
+behavior are covered by new runtime tests. Local 187 tests, Ruff, Node and desktop/
+mobile browser smoke passed; new Linux runtime results remain pending.

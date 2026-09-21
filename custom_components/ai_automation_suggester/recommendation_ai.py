@@ -10,6 +10,28 @@ MAX_RESPONSE_BYTES = 32000
 ALLOWED_DOMAINS = {"light", "binary_sensor", "sensor", "switch", "fan", "climate", "cover"}
 
 
+def failure_details(error, stage):
+    """Persist only fixed diagnostic text, never provider messages or credentials."""
+    if stage == "validation":
+        code, message = "invalid_response", "OpenAI returned a response that did not pass recommendation validation."
+    elif isinstance(error, TimeoutError):
+        code, message = "timeout", "The AI request timed out; provider completion and billing may be unknown."
+    else:
+        code, message = "provider_error", "Home Assistant's AI Task could not return a response. Check its provider status."
+    return {"code": code, "message": message + " No automation was installed. This request will not be automatically retried."}
+
+
+def response_structure():
+    """Ask the native provider for structured JSON; validate references separately."""
+    import voluptuous as vol
+
+    return vol.Schema({vol.Required("ideas"): [{
+        vol.Required("title"): str, vol.Required("description"): str,
+        vol.Required("entity_ids"): [str], vol.Required("kind"): str,
+        vol.Required("evidence_ids"): [str],
+    }]})
+
+
 def prepare(inventory, behavior=None, excluded=()):
     """Only registry metadata and already-computed evidence leave the host."""
     excluded = set(excluded)
