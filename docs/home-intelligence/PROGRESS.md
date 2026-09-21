@@ -278,3 +278,14 @@ Full Recorder backfill, numeric/sequence routines, replay, feedback/application
 and full monetary accounting remain unfinished. Production remains 07d3945.
 The previously approved a10fb4e cache-only repair has NOT been deployed and its
 restart budget has not been consumed; it does not authorize this broader build.
+
+Recommendation release candidate f90058dbe9f38e9e57c87d60e12a8b5d68142caa:
+archive SHA-256 10d754ea5723aea0339f5b329eb84298240608b6c371c832ca393785bcd2e4e6.
+GitHub unit run 35547229030 succeeded; Linux HA/native-AI/runtime and frontend
+run 35547228943 succeeded. Earlier native-import failures were missing pinned
+conversation/camera test dependencies, now included. Tests invoke a fake native
+provider response and make no paid calls. Fresh encrypted pre-installation backup
+completed and its local copy matched the remote SHA-256. Requested approval to
+replace the still-pending cache-only build with this build, one restart total,
+and optionally one bounded OpenAI AI Task request for selected metadata.
+No new production build, restart or paid request has occurred yet.

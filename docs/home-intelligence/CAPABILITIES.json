@@ -4,7 +4,14 @@
     "date": "2026-09-20",
     "commit": "07d394563ccba199f08a124d6ffd08c3c818e0cf",
     "ha_version": "2026.9.3",
-    "verified_scope": ["first installation", "local audit configuration", "live inventory rendering", "build file verification", "paused observation diagnostics", "guided interface update"],
+    "verified_scope": [
+      "first installation",
+      "local audit configuration",
+      "live inventory rendering",
+      "build file verification",
+      "paused observation diagnostics",
+      "guided interface update"
+    ],
     "normal_restarts": 2,
     "recovery_restarts": 0,
     "observation_enabled": false,
@@ -154,21 +161,35 @@
     },
     {
       "requirement": "HI-10",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/behavior.py",
+        "custom_components/ai_automation_suggester/recommendation_ai.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_behavior.py",
+        "tests/test_recommendation_ai.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "Recommendation workflow in development only. One bounded motion-to-light detector and native OpenAI AI Task preview/consent/validation are implemented; full statistical benchmarks, routine modeling, monetary budgets and live validation remain incomplete."
     },
     {
       "requirement": "HI-11",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/behavior.py",
+        "custom_components/ai_automation_suggester/recommendation_ai.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_behavior.py",
+        "tests/test_recommendation_ai.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "Recommendation workflow in development only. One bounded motion-to-light detector and native OpenAI AI Task preview/consent/validation are implemented; full statistical benchmarks, routine modeling, monetary budgets and live validation remain incomplete."
     },
     {
       "requirement": "HI-12",
@@ -181,12 +202,19 @@
     },
     {
       "requirement": "HI-13",
-      "status": "not_implemented",
-      "implementation": [],
-      "unit_tests": [],
+      "status": "partial",
+      "implementation": [
+        "custom_components/ai_automation_suggester/behavior.py",
+        "custom_components/ai_automation_suggester/recommendation_ai.py",
+        "custom_components/ai_automation_suggester/organization_api.py"
+      ],
+      "unit_tests": [
+        "tests/test_behavior.py",
+        "tests/test_recommendation_ai.py"
+      ],
       "ha_runtime_tested": false,
       "live_validated": false,
-      "limitations": "See PROGRESS.md and full SPEC.md. Partial status does not satisfy the complete requirement."
+      "limitations": "Recommendation workflow in development only. One bounded motion-to-light detector and native OpenAI AI Task preview/consent/validation are implemented; full statistical benchmarks, routine modeling, monetary budgets and live validation remain incomplete."
     },
     {
       "requirement": "HI-14",
