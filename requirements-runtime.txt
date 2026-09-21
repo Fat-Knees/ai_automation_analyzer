@@ -9,3 +9,4 @@ litellm>=1.67.0
 gazetteer-matcher==1.1.0
 hassil==3.12.1
 home-assistant-intents==2026.8.28
+PyTurboJPEG==1.8.3
