@@ -159,7 +159,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     this._loaded = false;
     this._error = null;
     this._root = null;
-    this._view = "start";
+    this._view = "recommendations";
     if (typeof this.attachShadow === "function") {
       this._root = this.attachShadow({ mode: "open" });
       const style = document.createElement("style");
@@ -833,6 +833,116 @@ class HomeIntelligenceCard extends HTMLElementBase {
     return section;
   }
 
+  async recommendationAI(action) {
+    if (this._aiBusy) return;
+    this._aiBusy = true;
+    this._aiError = null;
+    this.render();
+    try {
+      const path = "ai_automation_suggester/recommendation_ai";
+      if (!action) {
+        this._aiStatus = await this._hass.callApi("GET", path);
+        this._aiTask ||= this._aiStatus.tasks?.[0]?.entity_id;
+        this._aiIdeas = asArray(this._aiStatus.history).flatMap(item => asArray(item.ideas));
+      } else if (action === "preview") {
+        this._aiPreview = await this._hass.callApi("POST", path, { action, task: this._aiTask });
+      } else if (action === "generate" && this._aiPreview) {
+        const result = await this._hass.callApi("POST", path, { action, task: this._aiPreview.task, digest: this._aiPreview.digest, approve_cloud_request: true });
+        this._aiIdeas = result.ideas;
+        this._aiPreview = null;
+      }
+    } catch (error) { this._aiError = errorMessage(error, "The AI request could not complete."); }
+    finally { this._aiBusy = false; this.render(); }
+  }
+
+  _renderAIRecommendations() {
+    const section = this._make("section", undefined, "panel");
+    section.append(this._make("h3", "AI automation ideas for your home"));
+    section.append(this._make("p", "Use your existing Home Assistant OpenAI AI Task. Preview the information first; no second API key is needed. Ideas based on device capabilities are labeled separately from learned activity patterns."));
+    section.append(this._button(this._aiBusy ? "Working…" : "Find configured AI and saved ideas", () => this.recommendationAI(), { disabled: this._aiBusy }));
+    if (this._aiError) section.append(this._make("p", this._aiError, "error"));
+    if (this._aiStatus) {
+      if (!this._aiStatus.tasks?.length) section.append(this._make("p", "No available OpenAI AI Task was found. Add an AI Task in Home Assistant's OpenAI integration, then refresh here."));
+      else {
+        const label = this._make("label", "AI Task");
+        const select = document.createElement("select");
+        for (const task of this._aiStatus.tasks) {
+          const option = this._make("option", task.name); option.value = task.entity_id; select.append(option);
+        }
+        select.value = this._aiTask;
+        select.disabled = this._aiBusy;
+        select.addEventListener("change", () => { this._aiTask = select.value; this._aiPreview = null; this.render(); });
+        label.append(select); section.append(label);
+        section.append(this._button("Preview information for AI", () => this.recommendationAI("preview"), { disabled: this._aiBusy }));
+      }
+      section.append(this._make("p", this._aiStatus.limits, "muted"));
+    }
+    if (this._aiPreview) {
+      section.append(this._make("p", this._aiPreview.notice, "warning"));
+      section.append(this._make("p", `${this._aiPreview.payload.entities.length} selected entities; ${this._aiPreview.bytes} bytes of instructions and facts. ${this._aiPreview.payload.inventory_truncated ? "Inventory is limited; not all devices are included." : ""}`));
+      section.append(this._disclosure("Exact information and instructions to be sent", this._make("pre", this._aiPreview.instructions)));
+      section.append(this._button("Send this preview to OpenAI and generate ideas", () => this.recommendationAI("generate"), { disabled: this._aiBusy }));
+    }
+    for (const idea of asArray(this._aiIdeas)) {
+      const card = this._make("article", undefined, "notice");
+      card.append(this._make("h3", idea.title));
+      card.append(this._make("p", idea.kind === "capability_idea" ? "AI capability idea — not an observed household habit" : "AI interpretation of local evidence", "muted"));
+      card.append(this._make("p", idea.description), this._make("p", asArray(idea.entity_ids).join(", "), "entity-id"));
+      card.append(this._make("p", idea.risk, "warning"), this._make("p", "Not installed or enabled. Review the desired behavior and actual loads first."));
+      section.append(card);
+    }
+    return section;
+  }
+
+  async analyzeRecommendations() {
+    if (this._analysisBusy) return;
+    this._analysisBusy = true;
+    this._analysisError = null;
+    this.render();
+    try {
+      this._recommendations = await this._hass.callApi("GET", "ai_automation_suggester/recommendations");
+    } catch (error) { this._analysisError = errorMessage(error, "Unable to analyze recorded activity."); }
+    finally { this._analysisBusy = false; this.render(); }
+  }
+
+  _renderRecommendations() {
+    const section = this._make("section", undefined, "panel");
+    const title = this._make("h2", "Automation recommendations");
+    title.tabIndex = -1;
+    section.append(title);
+    section.append(this._renderAIRecommendations());
+    section.append(this._make("p", "Find repeated motion-to-light patterns in recorded activity. Room cleanup is not required. Analysis runs locally and does not turn devices on, enable observation, or contact an AI provider."));
+    section.append(this._button(this._analysisBusy ? "Analyzing activity…" : "Analyze recorded activity", () => this.analyzeRecommendations(), { disabled: this._analysisBusy }));
+    if (this._analysisError) section.append(this._make("p", this._analysisError, "error"));
+    const result = this._recommendations;
+    if (!result) {
+      section.append(this._make("p", "This detector checks separate earlier and later periods and compares activity with the same time on other days. It needs several days of covered history; missing data is not inactivity.", "muted"));
+      return section;
+    }
+    section.append(this._make("p", `${result.candidate_count ?? 0} candidate relationships checked. ${asArray(result.recommendations).length} passed this detector's checks.`));
+    if (result.truncated) section.append(this._make("p", "Analysis reached a limit. Results are incomplete; not all possible relationships were checked.", "warning"));
+    if (!asArray(result.recommendations).length) section.append(this._empty("No recommendation has enough evidence yet. The reasons below explain whether history is missing, a pattern failed validation, or an existing automation needs review."));
+    for (const candidate of asArray(result.recommendations)) {
+      const card = this._make("article", undefined, "notice");
+      card.append(this._make("h3", candidate.title));
+      card.append(this._make("p", "Based on recorded activity · local analysis, not an AI-generated claim", "muted"));
+      const evidence = candidate.evidence;
+      card.append(this._make("p", `Later-period check: ${evidence.holdout.matches} matches in ${evidence.holdout.opportunities} eligible opportunities across ${evidence.holdout.days} days. Typical delay: ${evidence.holdout.median_delay_seconds} seconds.`));
+      card.append(this._make("p", `Earlier-period check: ${evidence.training.matches}/${evidence.training.opportunities}. Same-time comparison baseline: ${Math.round(evidence.conservative_baseline * 100)}%. These are observed match rates, not the probability you want this automation.`));
+      card.append(this._make("p", candidate.risk, "warning"), this._make("p", candidate.next_action));
+      const draft = this._make("pre", JSON.stringify(candidate.automation, null, 2));
+      card.append(this._disclosure("Inspect automation draft — not installed or replayed", draft));
+      section.append(card);
+    }
+    const reviewed = this._make("ul");
+    for (const item of asArray(result.reviewed)) reviewed.append(this._make("li", `${display(item.trigger?.name)} → ${display(item.action?.name)}: ${item.reason}`));
+    section.append(this._disclosure("Why other ideas were not recommended", reviewed));
+    const limits = this._make("ul");
+    for (const limitation of asArray(result.limitations)) limits.append(this._make("li", limitation));
+    section.append(this._disclosure("What this analysis can and cannot establish", limits));
+    return section;
+  }
+
   async observationRequest(enabled) {
     if (this._loading) return;
     this._loading = true;
@@ -958,7 +1068,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     const title = this._make("h2", "Start with your rooms");
     title.tabIndex = -1;
     section.append(title);
-    section.append(this._make("p", "Home Intelligence will use your rooms and device activity to help suggest useful automations. This early version can review your home organization and record optional observations. Automatic behavior analysis and new AI recommendations are not ready yet."));
+    section.append(this._make("p", "Room review is optional. Recommendations can analyze recorded motion-to-light patterns using your existing room assignments. Broader routines and AI explanations are still being implemented."));
     section.append(this._make("p", "For now, just check whether the room names match your home. You do not need to assign every sensor or answer hundreds of questions. Phones, weather, and whole-home devices can stay without a room."));
     section.append(this._button("Review my rooms", () => this._navigate("rooms")));
     section.append(this._make("p", "Nothing on this page turns devices on or changes your existing automations. Room edits are saved as plans only.", "muted"));
@@ -966,7 +1076,7 @@ class HomeIntelligenceCard extends HTMLElementBase {
     for (const [heading, text] of [
       ["1. Review your rooms", "Available now. Check the room list and optionally describe anything that needs correcting."],
       ["2. Choose what to observe", "Optional. Local collection is separate from room review and pauses after each restart."],
-      ["3. Review automation ideas", "Still in development. Collecting data does not yet produce behavior-based recommendations."],
+      ["3. Review automation ideas", "Open Recommendations to analyze recorded activity and inspect evidence. Nothing is installed or enabled automatically."],
     ]) {
       const item = this._make("div", undefined, "panel");
       item.append(this._make("h3", heading), this._make("p", text));
@@ -1021,17 +1131,18 @@ class HomeIntelligenceCard extends HTMLElementBase {
       if (this._error) content.append(this._renderNotice("The data shown below may be stale. Refresh before reviewing or saving.", "notice warning"));
       const nav = this._make("nav", undefined, "navigation");
       nav.setAttribute("aria-label", "Home Intelligence sections");
-      for (const [view, label] of [["start", "Start here"], ["rooms", "Rooms"], ["activity", "Recorded activity"], ["observation", "Observation"], ["advanced", "Advanced review"]]) {
+      for (const [view, label] of [["recommendations", "Recommendations"], ["start", "Start here"], ["rooms", "Rooms"], ["activity", "Recorded activity"], ["observation", "Observation"], ["advanced", "Advanced review"]]) {
         const button = this._button(label, () => this._navigate(view), { className: "secondary" });
         button.setAttribute("aria-pressed", String(this._view === view));
         nav.append(button);
       }
       content.append(nav);
+      if (this._view === "recommendations") content.append(this._renderRecommendations());
       if (this._view === "start") content.append(this._renderStart());
       if (this._view === "rooms") content.append(this._renderRooms());
       if (this._view === "activity") content.append(this._renderActivity());
       if (this._view === "observation") {
-        content.append(this._renderNotice("This is optional. Observation records selected device changes locally; it does not yet generate automation recommendations. You can leave it paused while reviewing your rooms."));
+        content.append(this._renderNotice("Observation records selected device changes locally. Recommendations analyzes that history when you ask; collection itself does not contact AI or control devices."));
         content.append(this._renderObservation());
       }
       if (this._view === "advanced") {

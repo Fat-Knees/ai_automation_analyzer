@@ -162,6 +162,38 @@ class HistoryStore:
                                 "No earlier Recorder history is imported yet. Missing observations do not mean a device was off.",
                                 "Seed and restored states do not establish a household action. Control origin can be unknown."]}
 
+    def analysis_snapshot(self, identities, start, end):
+        """Bounded consistent selected-history read; never guess missing coverage."""
+        identities = sorted(set(identities))
+        if len(identities) > 128 or not math.isfinite(start) or not math.isfinite(end) or start >= end:
+            raise ValueError("Analysis supports at most 128 entities and a finite time window")
+        result = {"start": start, "end": end, "events": [], "coverage": [], "truncated": False}
+        if not identities:
+            return result
+        marks = ",".join("?" for _ in identities)
+        with self.connect() as connection:
+            connection.execute("BEGIN")
+            rows = connection.execute(
+                f"SELECT * FROM events WHERE identity IN ({marks}) AND at>=? AND at<=? "
+                "AND identity NOT IN (SELECT identity FROM exclusions) ORDER BY at,id LIMIT 20001",
+                (*identities, start, end)).fetchall()
+            result["truncated"] = len(rows) > 20000
+            rows = list(rows[:20000])
+            for identity in identities:
+                seed = connection.execute("SELECT * FROM events WHERE identity=? AND at<? "
+                                          "AND identity NOT IN (SELECT identity FROM exclusions) ORDER BY at DESC,id DESC LIMIT 1",
+                                          (identity, start)).fetchone()
+                if seed:
+                    rows.append(seed)
+            coverage = connection.execute(
+                f"SELECT * FROM coverage WHERE identity IN ({marks}) AND end>=? AND start<=? "
+                "AND identity NOT IN (SELECT identity FROM exclusions) ORDER BY start,end LIMIT 4001",
+                (*identities, start, end)).fetchall()
+            result["truncated"] |= len(coverage) > 4000
+            result["coverage"] = [dict(row) for row in coverage[:4000]]
+            result["events"] = [{**dict(row), "attributes": json.loads(row["attributes"]), "mapping": json.loads(row["mapping"])} for row in rows]
+        return result
+
     def exclude(self, identity):
         """Privacy removal and future ingestion refusal commit together."""
         with self.connect() as connection:

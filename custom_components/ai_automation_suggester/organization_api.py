@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -136,6 +137,9 @@ class OrganizationState:
         self.active_entries = set()
         self.build = None
         self.observer = None
+        self.analysis_cache = None
+        self.analysis_cache_at = 0
+        self.ai_request_lock = asyncio.Lock()
 
     async def load(self):
         if self.data is None:
@@ -249,7 +253,169 @@ async def async_setup_organization(hass):
     hass.http.register_view(OrganizationLayoutView())
     hass.http.register_view(OrganizationObservationView())
     hass.http.register_view(OrganizationTimelineView())
+    hass.http.register_view(OrganizationRecommendationsView())
+    hass.http.register_view(OrganizationAIView())
     hass.data[DOMAIN][STATE_KEY] = state
+
+
+class OrganizationRecommendationsView(OrganizationView):
+    url = "/api/ai_automation_suggester/recommendations"
+    name = "api:ai_automation_suggester:recommendations"
+
+    async def get(self, request):
+        from .behavior import analyze
+        from .organization import with_effective_areas
+
+        state = self.state(request)
+        if request.query:
+            return self.json({"error": "No query parameters are supported"}, status_code=400)
+        async with state.lock:
+            if not state.observer or state.observer.error:
+                raise web.HTTPServiceUnavailable(reason="Local history is unavailable")
+            inventory, definitions, limitations = collect_inventory(state.hass)
+            inventory = with_effective_areas(inventory)
+            policies = state.data["preferences"].get("layout", {}).get("entity_policies", {})
+            excluded = [identity for identity, policy in policies.items() if policy.get("privacy_excluded") or policy.get("analysis") == "ignore"]
+            revision = hashlib.sha256(json.dumps([inventory, definitions, excluded], sort_keys=True).encode()).hexdigest()
+            now = time.time()
+            if state.analysis_cache and state.analysis_cache[0] == revision and now - state.analysis_cache_at < 60:
+                return self.json(state.analysis_cache[1])
+            identities = [row["id"] for row in inventory["entities"] if row["id"] not in excluded and not row.get("disabled")
+                          and (row["entity_id"].startswith("light.") or (row["entity_id"].startswith("binary_sensor.") and row.get("device_class") in {"motion", "occupancy"}))]
+            if len(identities) > 128:
+                return self.json({"error": "More than 128 eligible entities; select a smaller analysis scope before analysis"}, status_code=400)
+            snapshot = await state.hass.async_add_executor_job(state.observer.store.analysis_snapshot, identities, now - 30 * 86400, now)
+            result = await state.hass.async_add_executor_job(
+                lambda: analyze(inventory, definitions, snapshot, timezone=state.hass.config.time_zone, excluded=excluded))
+            result["limitations"].extend(limitations)
+            result["analyzed_at"] = now
+            state.analysis_cache, state.analysis_cache_at = (revision, result), now
+            return self.json(result)
+
+    async def post(self, request):
+        self.state(request)
+        raise web.HTTPMethodNotAllowed("POST", ["GET"])
+
+
+def ai_context(state):
+    from .recommendation_ai import prepare
+
+    inventory, definitions, _ = collect_inventory(state.hass)
+    from .organization import with_effective_areas
+
+    inventory = with_effective_areas(inventory)
+    policies = state.data["preferences"].get("layout", {}).get("entity_policies", {})
+    excluded = [identity for identity, policy in policies.items() if policy.get("privacy_excluded") or policy.get("analysis") == "ignore"]
+    revision = hashlib.sha256(json.dumps([inventory, definitions, excluded], sort_keys=True).encode()).hexdigest()
+    behavior = state.analysis_cache[1] if state.analysis_cache and state.analysis_cache[0] == revision and time.time() - state.analysis_cache_at < 300 else None
+    return prepare(inventory, behavior=behavior, excluded=excluded)
+
+
+def ai_tasks(hass):
+    registry = entity_registry.async_get(hass)
+    tasks = []
+    for entry in registry.entities.values():
+        if entry.entity_id.startswith("ai_task.") and entry.platform == "openai_conversation" and not entry.disabled_by:
+            value = hass.states.get(entry.entity_id)
+            if value and value.state != "unavailable" and int(value.attributes.get("supported_features", 0)) & 1:
+                tasks.append({"entity_id": entry.entity_id, "name": entry.name or entry.original_name or entry.entity_id, "provider": "OpenAI"})
+    return tasks
+
+
+class OrganizationAIView(OrganizationView):
+    """Explicit preview/approval; native AI task has no HA tools or attachments."""
+    url = "/api/ai_automation_suggester/recommendation_ai"
+    name = "api:ai_automation_suggester:recommendation_ai"
+
+    async def get(self, request):
+        state = self.state(request)
+        async with state.lock:
+            preview = ai_context(state)
+            journal = state.data.get("ai_recommendation_journal", [])
+            allowed = {row["entity_id"] for row in preview["payload"]["entities"]}
+            history = [{**row, "ideas": [idea for idea in row.get("ideas", []) if set(idea["entity_ids"]).issubset(allowed)]}
+                       for row in journal if row.get("status") == "completed"]
+            return self.json({"tasks": ai_tasks(state.hass), "history": history[-10:], "running": state.ai_request_lock.locked(),
+                              "limits": "At most 3 requests per UTC day and 30 per month. No automatic retries. This is a call limit, not a dollar guarantee; provider billing and output limits apply."})
+
+    async def post(self, request):
+        from .recommendation_ai import validate_response
+
+        state = self.state(request)
+        raw = bytearray()
+        async for chunk in request.content.iter_chunked(2048):
+            raw.extend(chunk)
+            if len(raw) > 4096:
+                raise web.HTTPRequestEntityTooLarge(max_size=4096, actual_size=len(raw))
+        try:
+            body = json.loads(raw)
+            if not isinstance(body, dict) or body.get("action") not in {"preview", "generate"}:
+                raise ValueError("Choose preview or generate")
+            expected = {"action", "task"} if body["action"] == "preview" else {"action", "task", "digest", "approve_cloud_request"}
+            if set(body) != expected or not isinstance(body["task"], str):
+                raise ValueError("Unsupported AI request fields")
+            tasks = ai_tasks(state.hass)
+            if body["task"] not in {row["entity_id"] for row in tasks}:
+                raise ValueError("Choose an available OpenAI AI Task")
+            async with state.lock:
+                preview = ai_context(state)
+            bound_digest = hashlib.sha256((body["task"] + preview["digest"]).encode()).hexdigest()
+            if body["action"] == "preview":
+                return self.json({"task": body["task"], "provider": "OpenAI", **preview,
+                                  "digest": bound_digest,
+                                  "notice": "Sends only the displayed selected entity names, IDs, device classes, area names and any displayed summarized behavioral evidence to OpenAI. No raw history, credentials, images or device-control tools. API charges may apply. Ideas without behavioral evidence are labeled capability ideas."})
+            if body["approve_cloud_request"] is not True or body["digest"] != bound_digest:
+                return self.json({"error": "Approve a fresh, unchanged request preview"}, status_code=409)
+        except (ValueError, TypeError, KeyError) as err:
+            return self.json({"error": str(err)}, status_code=400)
+        if state.ai_request_lock.locked():
+            return self.json({"error": "An AI request is already running"}, status_code=409)
+        async with state.ai_request_lock:
+            now = datetime.now(timezone.utc)
+            async with state.lock:
+                current = ai_context(state)
+                if hashlib.sha256((body["task"] + current["digest"]).encode()).hexdigest() != bound_digest:
+                    return self.json({"error": "Home information changed; preview the request again"}, status_code=409)
+                journal = state.data.get("ai_recommendation_journal", [])
+                prior = next((row for row in reversed(journal) if row["digest"] == bound_digest), None)
+                if prior:
+                    if prior["status"] == "completed":
+                        return self.json({"ideas": prior["ideas"], "cached": True})
+                    return self.json({"error": "This request was already attempted. Its result may be unknown; it will not be automatically repeated."}, status_code=409)
+                month = now.strftime("%Y-%m")
+                day = now.strftime("%Y-%m-%d")
+                monthly = [row for row in journal if row["date"].startswith(month)]
+                if len(monthly) >= 30 or sum(row["date"] == day for row in monthly) >= 3:
+                    return self.json({"error": "AI request allowance reached"}, status_code=429)
+                updated = copy.deepcopy(state.data)
+                updated["ai_recommendation_journal"] = monthly + [{"digest": bound_digest, "task": body["task"], "date": day, "status": "pending"}]
+                await state.store.async_save(updated)
+                state.data = updated
+            try:
+                from homeassistant.components.ai_task import async_generate_data
+                from homeassistant.core import Context
+
+                async with asyncio.timeout(90):
+                    response = await async_generate_data(state.hass, task_name="Home Intelligence recommendations",
+                                                         entity_id=body["task"], instructions=preview["instructions"],
+                                                         attachments=None, llm_api=None,
+                                                         context=Context(user_id=request["hass_user"].id))
+                ideas = validate_response(response.data, preview)
+            except Exception as err:
+                async with state.lock:
+                    updated = copy.deepcopy(state.data)
+                    record = next(row for row in updated["ai_recommendation_journal"] if row["digest"] == bound_digest)
+                    record["status"] = "failed_or_unknown"
+                    await state.store.async_save(updated)
+                    state.data = updated
+                return self.json({"error": f"AI request did not produce a validated result ({type(err).__name__}). No automation was installed."}, status_code=502)
+            async with state.lock:
+                updated = copy.deepcopy(state.data)
+                record = next(row for row in updated["ai_recommendation_journal"] if row["digest"] == bound_digest)
+                record.update(status="completed", ideas=ideas)
+                await state.store.async_save(updated)
+                state.data = updated
+            return self.json({"ideas": ideas, "cached": False})
 
 
 class OrganizationLayoutView(OrganizationView):

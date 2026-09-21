@@ -250,3 +250,31 @@ backup, pre-restart restoration and no-repeat-on-uncertain-restart behavior.
 Final cache-fix CI result: both run 35545782603 (unit) and run 35545782579
 (Linux HA plus desktop/mobile frontend) completed successfully. Exact-build
 repair approval was requested; installation is pending the user's answer.
+
+## Recommendation workflow implementation (not deployed)
+
+Implemented a bounded local motion-to-light detector with explicit coverage,
+seed/restored-state handling, episode debounce, already-on exclusions,
+chronological holdout, local-time day-shift controls, original-area checks and
+conservative related-automation warnings. Six synthetic tests pass. This is one
+screening detector, not the full HI-10 benchmark or calibrated causal inference.
+
+Added a recommendation-first page, owned-history analysis endpoint and native
+Home Assistant OpenAI AI Task bridge. The bridge uses the user's existing AI Task
+without reading its key. Exact request preview and administrator confirmation
+precede any cloud request; no attachments or HA control tools are supplied.
+Only bounded selected metadata and current summarized evidence are sent. Response
+schemas, entity/evidence references and sizes are checked. Durable pending records
+prevent duplicate retries after uncertainty, with 3/day and 30/month call limits.
+These limits are not a dollar cap; native-provider output billing is external.
+AI ideas are persisted separately from installation/enabling and generic ideas
+are labeled as capabilities rather than learned habits.
+
+Local validation: 186 tests passed, Ruff and Node passed; Chrome 153 desktop1280
+and mobile390 passed recommendation rendering, inert text, explicit preview/send,
+exact approval payload and no actuation. New real-HA tests cover native-task
+preview/consent/dedup and analysis authorization; Linux validation pending.
+Full Recorder backfill, numeric/sequence routines, replay, feedback/application
+and full monetary accounting remain unfinished. Production remains 07d3945.
+The previously approved a10fb4e cache-only repair has NOT been deployed and its
+restart budget has not been consumed; it does not authorize this broader build.

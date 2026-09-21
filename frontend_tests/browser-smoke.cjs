@@ -131,6 +131,18 @@ async function loadCard(page, baseUrl) {
     card.hass = {
       async callApi(method, endpoint, body) {
         window.__calls.push({ method, endpoint, body: body === undefined ? undefined : JSON.parse(JSON.stringify(body)) });
+        if (endpoint === "ai_automation_suggester/recommendation_ai") {
+          if (method === "GET") return { tasks: [{ entity_id: "ai_task.synthetic", name: "Synthetic OpenAI" }], history: [], limits: "Synthetic call limit" };
+          if (body.action === "preview") return { task: body.task, digest: "synthetic-digest", payload: { entities: [] }, bytes: 100, instructions: "Synthetic instructions", notice: "Synthetic request preview" };
+          if (body.action === "generate") return { ideas: [{ title: "Synthetic AI recommendation", description: "Consider a light schedule", entity_ids: ["light.synthetic"], kind: "capability_idea", risk: "Review actual load" }] };
+        }
+        if (method === "GET" && endpoint === "ai_automation_suggester/recommendations") return {
+          candidate_count: 2, recommendations: [{ title: '<script>window.__fixtureInjected=true</script> Synthetic light idea',
+            evidence: { training: { matches: 18, opportunities: 20 }, holdout: { matches: 8, opportunities: 10, days: 8, median_delay_seconds: 20 }, conservative_baseline: 0 },
+            risk: "Review load", next_action: "Review evidence", automation: { alias: "Synthetic draft" } }],
+          reviewed: [{ trigger: { name: "Synthetic trigger" }, action: { name: "Other light" }, reason: "Related automation already exists" }],
+          limitations: ["Synthetic test evidence, never live household observations"],
+        };
         if (method === "GET" && endpoint.startsWith("ai_automation_suggester/timeline?")) return {
           events: [{ at: 100, state: "on", kind: "seed", origin: "unknown", attributes: { brightness: 42 } }],
           coverage: [], next_cursor: null, limitations: ["Synthetic selected observations only"],
@@ -159,6 +171,8 @@ async function structurePanels(page) {
 
 async function runScenario(page, baseUrl, viewportLabel) {
   await loadCard(page, baseUrl);
+  await page.getByRole("heading", { name: "Automation recommendations", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Start here", exact: true }).click();
   await page.getByRole("heading", { name: "Start with your rooms" }).waitFor();
   assert.equal(await page.getByRole("heading", { name: "Entity explorer" }).count(), 0);
   assert.equal(await page.getByRole("button", { name: "Start local observation" }).count(), 0);
@@ -238,6 +252,7 @@ async function runScenario(page, baseUrl, viewportLabel) {
   }) : [];
   assert.ok(geometry.documentWidth <= geometry.viewportWidth + 1, `${viewportLabel}: no horizontal overflow (${geometry.documentWidth} > ${geometry.viewportWidth}); overflowers=${JSON.stringify(overflowers)}`);
   await loadCard(page, baseUrl);
+  await page.getByRole("button", { name: "Start here", exact: true }).click();
   await page.getByRole("button", { name: "Review my rooms", exact: true }).click();
   await page.getByRole("button", { name: "Start from my existing rooms", exact: true }).click();
   const imported = await page.evaluate(() => window.__card._layout);
@@ -250,6 +265,22 @@ async function runScenario(page, baseUrl, viewportLabel) {
   await page.getByRole("button", { name: "Show recent activity", exact: true }).click();
   await page.getByText("Initial state, not a new action. Origin: unknown.", { exact: true }).waitFor();
   assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.method === "POST").length, 0, "timeline cannot start observation or actuate devices");
+  await page.getByRole("button", { name: "Recommendations", exact: true }).click();
+  await page.getByRole("button", { name: "Analyze recorded activity", exact: true }).click();
+  await page.getByText(/Later-period check: 8 matches in 10/).waitFor();
+  assert.equal(await page.evaluate(() => Boolean(window.__fixtureInjected)), false, "recommendation names render inertly");
+  await page.getByText("Inspect automation draft — not installed or replayed", { exact: true }).click();
+  await page.getByText(/Synthetic draft/).waitFor();
+  assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.method === "POST").length, 0, "analysis does not start collection or apply drafts");
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "recommendations fit mobile width");
+  await page.getByRole("button", { name: "Find configured AI and saved ideas", exact: true }).click();
+  await page.getByRole("button", { name: "Preview information for AI", exact: true }).click();
+  assert.equal((await page.evaluate(() => window.__calls)).filter(call => call.body?.action === "generate").length, 0, "preview never invokes AI");
+  await page.getByRole("button", { name: "Send this preview to OpenAI and generate ideas", exact: true }).click();
+  await page.getByRole("heading", { name: "Synthetic AI recommendation", exact: true }).waitFor();
+  const generated = (await page.evaluate(() => window.__calls)).filter(call => call.body?.action === "generate");
+  assert.equal(generated.length, 1);
+  assert.deepEqual(generated[0].body, { action: "generate", task: "ai_task.synthetic", digest: "synthetic-digest", approve_cloud_request: true });
   return { viewportLabel, callCount: calls.length, geometry };
 }
 

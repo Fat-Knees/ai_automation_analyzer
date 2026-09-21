@@ -23,6 +23,18 @@ def test_overlap_retry_and_immutable_historical_mapping(store):
     assert store.diagnostics()["checkpoints"] == {"live": 100, "backfill": 101}
 
 
+def test_analysis_snapshot_keeps_pre_window_state_and_explicit_coverage(store):
+    events = [observation("registry-a", stamp, state, {}) for stamp, state in [(1, "off"), (11, "on"), (12, "off")]]
+    store.append(events, job="analysis-test", checkpoint=12, mappings={"registry-a": {"area_id": "old-room"}})
+    snapshot = store.analysis_snapshot(["registry-a"], 10, 20)
+    assert sorted(row["at"] for row in snapshot["events"]) == [1, 11, 12]
+    assert snapshot["coverage"] == []
+    assert not snapshot["truncated"]
+    assert all(row["mapping"]["area_id"] == "old-room" for row in snapshot["events"])
+    store.exclude("registry-a")
+    assert store.analysis_snapshot(["registry-a"], 10, 20)["events"] == []
+
+
 def test_timeline_is_bounded_keeps_mapping_and_excludes_private_rows(store):
     events = [observation("registry-a", 100 + i, str(i), {}, kind="state") for i in range(55)]
     store.append(events, job="live", checkpoint=154, mappings={"registry-a": {"area_id": "former-room"}})

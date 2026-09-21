@@ -209,6 +209,10 @@ async def test_non_admin_cannot_read_or_save(hass, hass_client, hass_read_only_a
     client = await hass_client(hass_read_only_access_token)
     response = await client.get("/api/ai_automation_suggester/organization")
     assert response.status == 403
+    response = await client.get("/api/ai_automation_suggester/recommendations")
+    assert response.status == 403
+    assert (await client.get("/api/ai_automation_suggester/recommendation_ai")).status == 403
+    assert (await client.post("/api/ai_automation_suggester/recommendation_ai", json={})).status == 403
     response = await client.get("/api/ai_automation_suggester/timeline?identity=anything")
     assert response.status == 403
     response = await client.post("/api/ai_automation_suggester/layout", json={})
@@ -243,3 +247,59 @@ async def test_timeline_reads_owned_evidence_and_rejects_malformed_queries(hass,
     for query in ("identity=timeline-identity&before_at=nan&before_id=bad", "identity=timeline-identity&limit=100000", ""):
         assert (await client.get("/api/ai_automation_suggester/timeline?" + query)).status == 400
     assert (await client.post("/api/ai_automation_suggester/timeline", json={})).status == 405
+
+
+async def test_recommendations_read_only_empty_history_and_validation(hass, hass_client):
+    entry = await setup_local(hass)
+    state = hass.data[DOMAIN][STATE_KEY]
+    client = await hass_client()
+    response = await client.get("/api/ai_automation_suggester/recommendations")
+    assert response.status == 200
+    data = await response.json()
+    assert data["recommendations"] == []
+    assert data["status"] == "insufficient_evidence"
+    assert not state.observer.running
+    assert (await client.post("/api/ai_automation_suggester/recommendations", json={})).status == 405
+    assert (await client.get("/api/ai_automation_suggester/recommendations?limit=999999")).status == 400
+    await hass.config_entries.async_unload(entry.entry_id)
+    assert (await client.get("/api/ai_automation_suggester/recommendations")).status == 503
+
+
+async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client, monkeypatch):
+    from types import SimpleNamespace
+    from homeassistant.components import ai_task
+
+    await setup_local(hass)
+    registry = entity_registry.async_get(hass)
+    task = registry.async_get_or_create("ai_task", "openai_conversation", "synthetic-ai-task")
+    light = registry.async_get_or_create("light", DOMAIN, "synthetic-ai-light")
+    hass.states.async_set(task.entity_id, "unknown", {"supported_features": 1})
+    calls = []
+
+    async def generate(hass, **kwargs):
+        calls.append(kwargs)
+        assert kwargs["llm_api"] is None and kwargs["attachments"] is None
+        return SimpleNamespace(data={"ideas": [{"title": "Synthetic idea", "description": "Consider a light schedule.",
+                                               "entity_ids": [light.entity_id], "kind": "capability_idea", "evidence_ids": []}]})
+
+    monkeypatch.setattr(ai_task, "async_generate_data", generate)
+    client = await hass_client()
+    endpoint = "/api/ai_automation_suggester/recommendation_ai"
+    status = await (await client.get(endpoint)).json()
+    assert status["tasks"][0]["entity_id"] == task.entity_id
+    preview_response = await client.post(endpoint, json={"action": "preview", "task": task.entity_id})
+    assert preview_response.status == 200
+    preview = await preview_response.json()
+    assert not calls
+    body = {"action": "generate", "task": task.entity_id, "digest": preview["digest"], "approve_cloud_request": False}
+    assert (await client.post(endpoint, json=body)).status == 409
+    assert not calls
+    body["approve_cloud_request"] = True
+    response = await client.post(endpoint, json=body)
+    assert response.status == 200
+    assert (await response.json())["ideas"][0]["installed"] is False
+    assert len(calls) == 1
+    assert (await (await client.post(endpoint, json=body)).json())["cached"] is True
+    assert len(calls) == 1
+    registry.async_update_entity(light.entity_id, name="Changed since preview")
+    assert (await client.post(endpoint, json=body)).status == 409
