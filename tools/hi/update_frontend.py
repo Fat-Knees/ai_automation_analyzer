@@ -55,9 +55,9 @@ class FrontendRemote(SSHRemote):
         return set(result.stdout.splitlines())
 
 
-def update(remote, artifact, previous, candidate, approval):
+def update(remote, artifact, previous, candidate, approval, *, validate_change=validate_ui_change):
     approval.validate(hashlib.sha256(Path(artifact).read_bytes()).hexdigest())
-    validate_ui_change(previous, candidate)
+    validate_change(previous, candidate)
     flight = remote.preflight("2026.9.3")
     if not flight["component_exists"] or flight["component_symlink"]:
         raise ReleaseError("UI update requires the verified existing installation")

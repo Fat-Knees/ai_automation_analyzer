@@ -267,6 +267,7 @@ async def test_recommendations_read_only_empty_history_and_validation(hass, hass
 
 async def test_native_ai_preview_consent_validation_and_dedup(hass, hass_client, monkeypatch):
     from types import SimpleNamespace
+
     from homeassistant.components import ai_task
 
     await setup_local(hass)
