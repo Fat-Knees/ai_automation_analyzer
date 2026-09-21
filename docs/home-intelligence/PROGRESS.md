@@ -325,3 +325,10 @@ Repair CI 35548699346: 11 runtime tests passed and one test failed because its
 new assertion imported the obsolete voluptuous_openapi serializer. HA 2026.9.3
 uses probatio.to_openapi; corrected that test to the installed-version serializer.
 This CI failure is separate from the still-unidentified live request failure.
+
+Repair candidate e711804c7bfbc1aaf3e978fdc803a2fa7c54f19d passed unit run
+35548930958 and runtime/frontend run 35548930970 (12 real-HA runtime tests).
+Artifact SHA-256 7b676272ba9efc9fa87fb78da05b04ed946a6d7d29926ef12cf2c787a65012c1.
+Requested new exact-build installation approval, one restart and one optional
+billable metadata-only retry. No repair deployment or retry has occurred.
+Production remains f90058d; AI recommendations are not live validated.
